@@ -1,0 +1,20 @@
+fastapi==0.139.2
+uvicorn[standard]==0.51.0
+SQLAlchemy==2.0.51
+pydantic==2.13.4
+pydantic-settings==2.14.2
+python-pptx==1.0.2
+Jinja2==3.1.6
+python-multipart==0.0.32
+openpyxl==3.1.5
+python-docx==1.2.0
+
+# test-only
+pytest==9.1.1
+httpx==0.28.1
+
+# optional — only imported by app/services/scraping/generic_scraper.py's
+# fetch_rendered_html, which requires outbound network access to arbitrary
+# listing sites and isn't exercised by the test suite. `pip install
+# playwright && playwright install chromium` to enable live scraping.
+# playwright
