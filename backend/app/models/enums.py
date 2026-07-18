@@ -25,6 +25,18 @@ class ServiceChargePriceType(str, enum.Enum):
     TBD = "tbd"
 
 
+class PricingModel(str, enum.Enum):
+    """Direct-lease space is priced per m² per year (the original 7-listing
+    reference brochure, §1). Flexible/serviced-office inventory — the shape
+    of the actual "Market Inventory" template this engine now also targets —
+    is priced per desk per month instead. Comparison/QA logic branches on
+    this field rather than assuming one pricing shape fits every listing.
+    """
+
+    PER_SQM_ANNUAL = "per_sqm_annual"
+    PER_DESK_MONTHLY = "per_desk_monthly"
+
+
 class ProposalStatus(str, enum.Enum):
     DRAFT = "draft"
     SENT = "sent"

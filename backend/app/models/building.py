@@ -42,6 +42,12 @@ class Building(Base):
 
     total_building_area_m2: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # Per-building distances shown on the "Market Inventory" template's fact
+    # sheets (e.g. "A10 3 km", "Schiphol 11 km") — genuinely building-specific,
+    # unlike the shared Neighbourhood.public_transport facts (§5.4).
+    accessibility_note: Mapped[str | None] = mapped_column(String, nullable=True)
+    airport_note: Mapped[str | None] = mapped_column(String, nullable=True)
+
     building_amenities: Mapped[list] = mapped_column(JSON, default=list)
 
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

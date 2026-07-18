@@ -51,3 +51,49 @@ def points_of_interest(neighbourhood: Neighbourhood) -> list[dict]:
 
 def public_transport_map(neighbourhood: Neighbourhood) -> list[dict]:
     return list(neighbourhood.public_transport or [])
+
+
+def build_region_map_url(
+    numbered_buildings: list[tuple[int, Building]], *, size: str = "800x520", grayscale: bool = True
+) -> str | None:
+    """Static map with one numbered red pin per building, matching the
+    "Market Inventory" template's grayscale region-map pages. Numbers are
+    passed in by the caller (global sequence across the whole Proposal, not
+    restarted per region) so a property's badge matches across the region
+    page, its own detail page, and the final All Properties Overview.
+    """
+    located = [(index, b) for index, b in numbered_buildings if b.latitude is not None and b.longitude is not None]
+    if not located:
+        return None
+
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    params: list[tuple[str, str]] = [("size", size), ("scale", "2")]
+    if grayscale:
+        params.append(("style", "feature:all|saturation:-100|lightness:5"))
+    for index, building in located:
+        # Static Maps marker labels are a single alphanumeric character — fall
+        # back to a dot for anything past 9 rather than silently truncating.
+        label = str(index) if 1 <= index <= 9 else "•"
+        params.append(("markers", f"color:0xC8102E|label:{label}|{building.latitude},{building.longitude}"))
+    if api_key:
+        params.append(("key", api_key))
+    return f"https://maps.googleapis.com/maps/api/staticmap?{urlencode(params)}"
+
+
+def fetch_static_map_image(url: str, *, timeout: float = 8.0) -> bytes | None:
+    """Downloads the map tile. Returns None — never raises — on any failure
+    (missing API key, no network, non-200/non-image response) so callers can
+    fall back to a placeholder without special-casing every error mode.
+    """
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 - fixed https googleapis.com host
+            if response.status != 200:
+                return None
+            if not response.headers.get("Content-Type", "").startswith("image/"):
+                return None
+            return response.read()
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None

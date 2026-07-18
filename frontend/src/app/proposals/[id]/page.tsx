@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { ProposalWorkspace } from "@/components/ProposalWorkspace";
-import { formatArea, formatRent } from "@/lib/format";
+import { formatArea, formatUnitHeadlinePrice } from "@/lib/format";
 
 export default async function ProposalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,7 +34,7 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
                 <span className="mr-2 font-mono text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
                 {unit.building?.name} — {unit.floor ?? "Unit"} · {formatArea(unit.available_area_m2)}
               </span>
-              <span className="text-muted">{formatRent(unit.rent_eur_per_m2_year, unit.rent_price_type)}</span>
+              <span className="text-muted">{formatUnitHeadlinePrice(unit)}</span>
             </div>
           ))}
         </div>

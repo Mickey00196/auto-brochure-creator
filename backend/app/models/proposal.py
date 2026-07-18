@@ -46,6 +46,16 @@ class Proposal(Base):
 
     status: Mapped[ProposalStatus] = mapped_column(Enum(ProposalStatus), default=ProposalStatus.DRAFT)
 
+    # Cover-page fields mirroring the "Market Inventory" template: eyebrow
+    # (document_type), big title (the client's name, rendered by the
+    # frontend/generator — not stored twice), subtitle (search_area_label).
+    document_type: Mapped[str] = mapped_column(String, default="Market Inventory")
+    search_area_label: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # list[dict]: e.g. [{"name": "...", "email": "...", "phone": "...", "photo": "..."}]
+    # — the closing "Project Team" page's contact cards.
+    project_team: Mapped[list] = mapped_column(JSON, default=list)
+
     # list[dict]: e.g. [{"format": "pptx", "url": "...", "generated_at": "..."}]
     generated_outputs: Mapped[list] = mapped_column(JSON, default=list)
 

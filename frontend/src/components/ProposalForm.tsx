@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { Building, Client } from "@/lib/types";
 import { api } from "@/lib/api";
 import { Button, Card } from "@/components/ui";
-import { formatArea, formatRent } from "@/lib/format";
+import { formatArea, formatUnitHeadlinePrice } from "@/lib/format";
 
 export function ProposalForm({ clients, buildings }: { clients: Client[]; buildings: Building[] }) {
   const router = useRouter();
@@ -106,7 +106,7 @@ export function ProposalForm({ clients, buildings }: { clients: Client[]; buildi
                         {unit.floor ?? "Unit"} · {formatArea(unit.available_area_m2)}
                       </span>
                     </div>
-                    <span className="text-muted">{formatRent(unit.rent_eur_per_m2_year, unit.rent_price_type)}</span>
+                    <span className="text-muted">{formatUnitHeadlinePrice(unit)}</span>
                   </label>
                 ))}
               </div>

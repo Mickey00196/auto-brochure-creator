@@ -12,15 +12,15 @@ def test_seed_demo_creates_proposal(client):
     assert r.status_code == 200
     body = r.json()
     assert body["title"] == "Office Shortlist · Amsterdam 2026"
-    assert len(body["selected_unit_ids"]) == 7
+    assert len(body["selected_unit_ids"]) == 8
 
 
 def test_comparison_endpoint_sorted_and_computed(client):
     proposal = client.post("/seed/demo").json()
     rows = client.get(f"/proposals/{proposal['proposal_id']}/comparison").json()
-    assert len(rows) == 7
-    ready = [r for r in rows if not r["is_tbd"]]
-    rates = [r["all_in_rate_eur_per_m2_year"] for r in ready]
+    assert len(rows) == 8
+    ready_per_sqm = [r for r in rows if not r["is_tbd"] and r["pricing_model"] == "per_sqm_annual"]
+    rates = [r["all_in_rate_eur_per_m2_year"] for r in ready_per_sqm]
     assert rates == sorted(rates)
 
 
@@ -65,12 +65,12 @@ def test_match_endpoint_scores_units_by_criteria(client):
     r = client.post("/match", json={"city": "Amsterdam", "size_m2_min": 100, "size_m2_max": 700})
     assert r.status_code == 200
     results = r.json()
-    assert len(results) == 7
+    assert len(results) == 8
     assert all(0 <= result["score"] <= 1 for result in results)
 
 
 def test_dashboard_reports_data_completeness(client):
     client.post("/seed/demo")
     dashboard = client.get("/dashboard").json()
-    assert dashboard["imported_properties"]["units"] == 7
+    assert dashboard["imported_properties"]["units"] == 8
     assert dashboard["data_completeness"]["tbd_field_count"] > 0

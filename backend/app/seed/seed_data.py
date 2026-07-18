@@ -1,26 +1,45 @@
-"""Seed data grounded in the reference brochure ("Office Shortlist ·
-Amsterdam 2026", Cushman & Wakefield for Perry Ellis, Houthavens, May 2026)
-described in spec §1.
+"""Seed data grounded in a real 7-listing direct-lease brochure (§1's gap
+table) plus a real "Market Inventory" flex-office template — see
+tests/test_seed_and_models.py and the top-level README for how each gap maps
+to a field.
 
-7 leasable units across 4 buildings — reproducing gap #1 (Danzigerkade 13-G
-splits into two independent units; a Moermanskkade-style building has
-separately available floors), gap #2 (fixed / from / tbd rent all present),
-gap #3 (shared neighbourhood transit fact instead of repeated per-unit text),
-gap #4 (parking AddOns spanning the real €618–€2,750 range, including the
-€618 outlier), and gap #6 (contract_term populated with the brochure's
-actual phrasing).
+8 leasable units across 5 buildings, split into 2 regions to exercise the
+Per Region grouping:
+
+- "Houthavens Waterfront": Danzigerkade 13-G (splits into two independent
+  units — gap #1) and Moermanskkade 600 (separately available 1st/2nd/4th
+  floor units — gap #1).
+- "Houthavens Central": Keilestraat 5, Spaarndammerdijk 202, and
+  Prinseneiland 12 — the last priced per-desk/month (`PricingModel.
+  PER_DESK_MONTHLY`) rather than per-m²/year, to demonstrate the
+  flex/serviced-office pricing shape alongside the original direct-lease one.
+
+Also reproduces gap #2 (fixed / from / tbd rent all present), gap #3 (shared
+neighbourhood transit fact instead of repeated per-unit text), gap #4
+(parking AddOns spanning the real €618–€2,750 range, including the €618
+outlier), and gap #6 (contract_term populated with real-brochure phrasing).
 
 Gap #5 (the €55 vs €60 service-charge inconsistency) is deliberately NOT
 reproduced here — seed data represents the *post-QA* clean state. The bug
 class itself is covered by a dedicated regression test in
 tests/test_qa.py::test_flags_service_charge_mismatch_between_sources.
+
+Names/firms below (client, brokers, buildings, "Flexspace Central") are all
+fictional — no real company's brochure, staff, or contact details are
+reproduced, including in the closing Project Team page.
 """
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
 from app.models import AddOn, Building, Client, Neighbourhood, Proposal, ProposalUnit, Unit
-from app.models.enums import DeliveryCondition, ProposalStatus, RentPriceType, ServiceChargePriceType
+from app.models.enums import (
+    DeliveryCondition,
+    PricingModel,
+    ProposalStatus,
+    RentPriceType,
+    ServiceChargePriceType,
+)
 
 
 def seed_database(db: Session) -> Proposal:
@@ -82,12 +101,14 @@ def seed_database(db: Session) -> Proposal:
         latitude=52.3891,
         longitude=4.8776,
         neighbourhood_id=houthavens.neighbourhood_id,
-        submarket="Amsterdam West / Houthavens",
+        submarket="Houthavens Waterfront",
         building_type="Turn-key Office",
         year_built=2019,
         energy_label="A",
         breeam_rating="Excellent",
         total_building_area_m2=581,
+        accessibility_note="A10 3 km",
+        airport_note="Schiphol 15 km",
         building_amenities=["Roof terrace", "Bicycle storage", "24/7 access", "On-site concierge"],
         description=(
             "A striking waterfront office building combining exposed structural detailing with "
@@ -163,12 +184,14 @@ def seed_database(db: Session) -> Proposal:
         latitude=52.3945,
         longitude=4.8838,
         neighbourhood_id=houthavens.neighbourhood_id,
-        submarket="Amsterdam West / Houthavens",
+        submarket="Houthavens Waterfront",
         building_type="High-end Office",
         year_built=2021,
         energy_label="A+",
         breeam_rating="Very Good",
         total_building_area_m2=1337,
+        accessibility_note="A10 2 km",
+        airport_note="Schiphol 14 km",
         building_amenities=["Restaurant", "Gym & spa", "Auditorium", "Bar"],
         description=(
             "A landmark multi-tenant office building offering flexible, independently leasable "
@@ -268,11 +291,13 @@ def seed_database(db: Session) -> Proposal:
         latitude=52.3901,
         longitude=4.8802,
         neighbourhood_id=houthavens.neighbourhood_id,
-        submarket="Amsterdam West / Houthavens",
+        submarket="Houthavens Central",
         building_type="Turn-key Office",
         year_built=2018,
         energy_label="A",
         total_building_area_m2=350,
+        accessibility_note="A10 3 km",
+        airport_note="Schiphol 16 km",
         building_amenities=["Bicycle storage", "24/7 access"],
         description="A compact, fully-fitted turn-key office on the ground floor of a converted warehouse.",
         photos=["keilestraat-exterior.jpg"],
@@ -320,11 +345,13 @@ def seed_database(db: Session) -> Proposal:
         latitude=52.3872,
         longitude=4.8691,
         neighbourhood_id=houthavens.neighbourhood_id,
-        submarket="Amsterdam West / Houthavens",
+        submarket="Houthavens Central",
         building_type="High-end Office",
         year_built=2020,
         energy_label="A",
         total_building_area_m2=275,
+        accessibility_note="A10 3 km",
+        airport_note="Schiphol 17 km",
         building_amenities=["Rooftop terrace", "Bar"],
         description="A design-forward boutique office with a private rooftop terrace overlooking the harbour.",
         photos=["spaarndammerdijk-exterior.jpg"],
@@ -362,13 +389,77 @@ def seed_database(db: Session) -> Proposal:
         )
     )
 
-    # ── The Proposal itself: "Office Shortlist · Amsterdam 2026" for Perry Ellis ──
+    # ── Building 5: Prinseneiland 12 — flex/serviced office, priced per desk/month
+    #    rather than per m²/year (PricingModel.PER_DESK_MONTHLY), demonstrating the
+    #    "Market Inventory" template's pricing shape alongside the direct-lease one ──
+    prinseneiland = Building(
+        name="Prinseneiland 12",
+        address="Prinseneiland 12",
+        postal_code="1013 LL",
+        city="Amsterdam",
+        country="Netherlands",
+        latitude=52.3862,
+        longitude=4.8869,
+        neighbourhood_id=houthavens.neighbourhood_id,
+        submarket="Houthavens Central",
+        building_type="Flexible / Serviced Office",
+        year_built=2017,
+        energy_label="B",
+        total_building_area_m2=120,
+        accessibility_note="A10 3 km",
+        airport_note="Schiphol 16 km",
+        building_amenities=["Shared lounge", "Bicycle storage"],
+        description="A boutique serviced-office floor above a converted warehouse, let fully fitted and desk-ready.",
+        photos=["prinseneiland-exterior.jpg"],
+        source_url="https://example-brokerage.test/listings/prinseneiland-12",
+    )
+    db.add(prinseneiland)
+    db.flush()
+
+    prinseneiland_unit = Unit(
+        building_id=prinseneiland.building_id,
+        floor="2nd floor",
+        available_area_m2=120,
+        delivery_condition=DeliveryCondition.TURN_KEY,
+        pricing_model=PricingModel.PER_DESK_MONTHLY,
+        desk_count=20,
+        price_per_desk_month_eur=980,
+        space_provider="Flexspace Central",
+        meeting_room_note="No internal meeting room. Available in the building.",
+        parking_ratio=None,
+        contract_term="Flexible, from 1 month",
+        contract_term_years=None,
+        availability="Available per direct",
+        unit_amenities=["Fully furnished", "High-speed fibre", "Shared kitchen"],
+        photos=["prinseneiland-unit-1.jpg"],
+        floorplan_url="prinseneiland-floorplan.pdf",
+    )
+    db.add(prinseneiland_unit)
+    db.flush()
+
+    # ── The Proposal itself ──
     proposal = Proposal(
         client_id=perry_ellis.client_id,
         title="Office Shortlist · Amsterdam 2026",
-        prepared_by="Cushman & Wakefield",
+        prepared_by="Norderly Real Estate Advisors",
+        document_type="Market Inventory",
+        search_area_label="Houthavens, Amsterdam",
+        project_team=[
+            {
+                "name": "Sam de Boer",
+                "role": "Associate Director",
+                "email": "sam.deboer@norderly.example",
+                "phone": "+31 (0)6 1234 5678",
+            },
+            {
+                "name": "Nina Alberts",
+                "role": "Senior Consultant",
+                "email": "nina.alberts@norderly.example",
+                "phone": "+31 (0)6 8765 4321",
+            },
+        ],
         status=ProposalStatus.DRAFT,
-        notes="Prepared exclusively for Perry Ellis. 7 locations selected in Houthavens, Amsterdam.",
+        notes="Prepared exclusively for Perry Ellis. 8 locations selected in Houthavens, Amsterdam.",
     )
     db.add(proposal)
     db.flush()
@@ -381,6 +472,7 @@ def seed_database(db: Session) -> Proposal:
         moermanskkade_4th,
         keilestraat_unit,
         spaarndammerdijk_unit,
+        prinseneiland_unit,
     ]
     for rank, unit in enumerate(ordered_units):
         db.add(ProposalUnit(proposal_id=proposal.proposal_id, unit_id=unit.unit_id, display_rank=rank))

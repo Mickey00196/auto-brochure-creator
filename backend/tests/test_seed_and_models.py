@@ -5,10 +5,24 @@ from __future__ import annotations
 from app.models import Building, Unit
 
 
-def test_seeded_proposal_has_seven_units_across_four_buildings(db_session, seeded_proposal):
-    assert len(seeded_proposal.selected_units) == 7
+def test_seeded_proposal_has_eight_units_across_five_buildings(db_session, seeded_proposal):
+    assert len(seeded_proposal.selected_units) == 8
     building_ids = {u.building_id for u in seeded_proposal.selected_units}
-    assert len(building_ids) == 4
+    assert len(building_ids) == 5
+
+
+def test_seeded_proposal_splits_into_two_regions(seeded_proposal):
+    regions = {u.building.submarket for u in seeded_proposal.selected_units}
+    assert regions == {"Houthavens Waterfront", "Houthavens Central"}
+
+
+def test_seeded_proposal_has_one_flex_pricing_unit(seeded_proposal):
+    flex_units = [u for u in seeded_proposal.selected_units if u.pricing_model == "per_desk_monthly"]
+    assert len(flex_units) == 1
+    unit = flex_units[0]
+    assert unit.desk_count == 20
+    assert unit.price_per_desk_month_eur == 980
+    assert unit.space_provider == "Flexspace Central"
 
 
 def test_gap_1_danzigerkade_splits_into_two_units(db_session, seeded_proposal):
@@ -28,8 +42,11 @@ def test_gap_1_moermanskkade_has_per_floor_units(db_session, seeded_proposal):
 
 
 def test_gap_2_rent_price_types_are_mixed(seeded_proposal):
-    """§1 row 2: rent appears fixed, "from", and TBD across the shortlist."""
-    price_types = {u.rent_price_type.value for u in seeded_proposal.selected_units}
+    """§1 row 2: rent appears fixed, "from", and TBD across the shortlist —
+    scoped to the direct-lease (per_sqm_annual) units, since rent_price_type
+    is meaningless for the one flex/per-desk-monthly demo unit."""
+    direct_lease_units = [u for u in seeded_proposal.selected_units if u.pricing_model == "per_sqm_annual"]
+    price_types = {u.rent_price_type.value for u in direct_lease_units}
     assert price_types == {"fixed", "from", "tbd"}
 
 
@@ -63,7 +80,9 @@ def test_gap_6_contract_term_is_first_class_field(seeded_proposal):
 
 
 def test_unit_is_price_ready_helper(seeded_proposal):
+    """5 ready direct-lease units + 1 ready flex unit = 6; the 2 Moermanskkade
+    TBD units remain not-ready."""
     ready_units = [u for u in seeded_proposal.selected_units if u.is_price_ready()]
     not_ready_units = [u for u in seeded_proposal.selected_units if not u.is_price_ready()]
-    assert len(ready_units) == 5
+    assert len(ready_units) == 6
     assert len(not_ready_units) == 2

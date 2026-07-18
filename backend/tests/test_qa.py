@@ -38,8 +38,12 @@ def test_no_conflict_when_sources_agree():
 
 def test_unacknowledged_tbd_rent_is_blocking(seeded_proposal):
     units = seeded_proposal.selected_units
-    tbd_units = [u for u in units if u.rent_price_type == "tbd"]
-    assert len(tbd_units) == 2  # §1 row 2: rent is TBD on 2 of 7 listings
+    # Scoped to direct-lease units: rent_price_type is meaningless for the
+    # one flex/per-desk-monthly demo unit, which defaults to the same "tbd"
+    # enum value without actually being unpriced (see check_tbd_headline_fields,
+    # which branches on pricing_model for exactly this reason).
+    tbd_units = [u for u in units if u.pricing_model == "per_sqm_annual" and u.rent_price_type == "tbd"]
+    assert len(tbd_units) == 2  # §1 row 2: rent is TBD on 2 of 7 direct-lease listings
 
     issues = check_tbd_headline_fields(tbd_units)
     assert all(i.severity == QASeverity.BLOCKING for i in issues if i.code == "tbd_rent")

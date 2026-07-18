@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import (
     DeliveryCondition,
+    PricingModel,
     ProposalStatus,
     RentPriceType,
     ServiceChargePriceType,
@@ -76,6 +77,8 @@ class BuildingBase(BaseModel):
     energy_label: str | None = None
     breeam_rating: str | None = None
     total_building_area_m2: float | None = None
+    accessibility_note: str | None = None
+    airport_note: str | None = None
     building_amenities: list[str] = Field(default_factory=list)
     description: str | None = None
     photos: list[str] = Field(default_factory=list)
@@ -110,6 +113,12 @@ class UnitBase(BaseModel):
     rent_eur_per_m2_year: float | None = None
     service_charge_price_type: ServiceChargePriceType = ServiceChargePriceType.TBD
     service_charge_eur_per_m2_year: float | None = None
+    pricing_model: PricingModel = PricingModel.PER_SQM_ANNUAL
+    desk_count: int | None = None
+    price_per_desk_month_eur: float | None = None
+    space_provider: str | None = None
+    meeting_room_note: str | None = None
+    parking_ratio: str | None = None
     contract_term: str | None = None
     contract_term_years: int | None = None
     availability: str | None = None
@@ -163,6 +172,9 @@ class ProposalBase(BaseModel):
     prepared_by: str | None = None
     status: ProposalStatus = ProposalStatus.DRAFT
     notes: str | None = None
+    document_type: str = "Market Inventory"
+    search_area_label: str | None = None
+    project_team: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ProposalCreate(ProposalBase):
@@ -174,6 +186,9 @@ class ProposalUpdate(BaseModel):
     prepared_by: str | None = None
     status: ProposalStatus | None = None
     notes: str | None = None
+    document_type: str | None = None
+    search_area_label: str | None = None
+    project_team: list[dict[str, Any]] | None = None
     unit_ids: list[str] | None = None
 
 

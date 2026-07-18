@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { formatArea, formatRent } from "@/lib/format";
+import { formatArea, formatUnitHeadlinePrice } from "@/lib/format";
 
 export default async function BuildingsPage() {
   const buildings = await api.buildings().catch(() => []);
@@ -54,7 +54,7 @@ export default async function BuildingsPage() {
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                     <th className="pb-2 pr-4">Floor</th>
                     <th className="pb-2 pr-4">Area</th>
-                    <th className="pb-2 pr-4">Rent</th>
+                    <th className="pb-2 pr-4">Pricing</th>
                     <th className="pb-2 pr-4">Service Charge</th>
                     <th className="pb-2 pr-4">Contract Term</th>
                     <th className="pb-2">Delivery</th>
@@ -71,17 +71,19 @@ export default async function BuildingsPage() {
                         )}
                       </td>
                       <td className="py-2 pr-4">
-                        {unit.rent_price_type === "tbd" ? (
+                        {formatUnitHeadlinePrice(unit) === "TBD" ? (
                           <Badge tone="warn">TBD</Badge>
                         ) : (
-                          formatRent(unit.rent_eur_per_m2_year, unit.rent_price_type)
+                          formatUnitHeadlinePrice(unit)
                         )}
                       </td>
                       <td className="py-2 pr-4">
-                        {unit.service_charge_price_type === "tbd" ? (
+                        {unit.pricing_model === "per_desk_monthly" ? (
+                          <span className="text-muted">Included</span>
+                        ) : unit.service_charge_price_type === "tbd" ? (
                           <Badge tone="warn">TBD</Badge>
                         ) : (
-                          formatRent(unit.service_charge_eur_per_m2_year, unit.service_charge_price_type)
+                          `€${unit.service_charge_eur_per_m2_year?.toLocaleString("en-US")}/m²/yr`
                         )}
                       </td>
                       <td className="py-2 pr-4">{unit.contract_term ?? "TBD"}</td>

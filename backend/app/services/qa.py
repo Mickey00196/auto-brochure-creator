@@ -110,15 +110,37 @@ def check_source_conflicts(raw_field_observations: dict[str, list[tuple[str, flo
 
 
 def check_tbd_headline_fields(units: list[Unit], acknowledged_unit_ids: set[str] | None = None) -> list[QAIssue]:
+    """Branches on `Unit.pricing_model`: a flex/per-desk-monthly unit's
+    headline price lives in `price_per_desk_month_eur`, not
+    `rent_eur_per_m2_year` — checking the wrong field would either falsely
+    flag a fully-priced flex listing or silently miss a genuinely unpriced
+    one, depending on that field's unrelated default."""
     acknowledged_unit_ids = acknowledged_unit_ids or set()
     issues: list[QAIssue] = []
     for unit in units:
+        severity = QASeverity.WARNING if unit.unit_id in acknowledged_unit_ids else QASeverity.BLOCKING
+
+        if unit.pricing_model == "per_desk_monthly":
+            if unit.price_per_desk_month_eur is None or unit.desk_count is None:
+                issues.append(
+                    QAIssue(
+                        severity=severity,
+                        code="tbd_rent",
+                        message=(
+                            f"Unit {unit.unit_id} ({unit.floor or 'unspecified floor'}) has no per-desk "
+                            "monthly price. Renders cleanly as 'TBD' but must not ship on export without "
+                            "sign-off."
+                        ),
+                        unit_id=unit.unit_id,
+                        field="price_per_desk_month_eur",
+                    )
+                )
+            continue
+
         if unit.rent_price_type == "tbd" or unit.rent_eur_per_m2_year is None:
             issues.append(
                 QAIssue(
-                    severity=(
-                        QASeverity.WARNING if unit.unit_id in acknowledged_unit_ids else QASeverity.BLOCKING
-                    ),
+                    severity=severity,
                     code="tbd_rent",
                     message=(
                         f"Unit {unit.unit_id} ({unit.floor or 'unspecified floor'}) has rent=TBD. "
@@ -131,9 +153,7 @@ def check_tbd_headline_fields(units: list[Unit], acknowledged_unit_ids: set[str]
         if unit.service_charge_price_type == "tbd" or unit.service_charge_eur_per_m2_year is None:
             issues.append(
                 QAIssue(
-                    severity=(
-                        QASeverity.WARNING if unit.unit_id in acknowledged_unit_ids else QASeverity.BLOCKING
-                    ),
+                    severity=severity,
                     code="tbd_service_charge",
                     message=(
                         f"Unit {unit.unit_id} ({unit.floor or 'unspecified floor'}) has service "

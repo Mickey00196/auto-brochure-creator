@@ -4,6 +4,7 @@ export type DeliveryCondition = "turn_key" | "shell_and_core" | "shell_and_core_
 export type RentPriceType = "fixed" | "from" | "on_request" | "tbd";
 export type ServiceChargePriceType = "fixed" | "tbd";
 export type ProposalStatus = "draft" | "sent" | "under_review" | "closed";
+export type PricingModel = "per_sqm_annual" | "per_desk_monthly";
 
 export interface Neighbourhood {
   neighbourhood_id: string;
@@ -26,6 +27,8 @@ export interface Building {
   building_type: string | null;
   energy_label: string | null;
   total_building_area_m2: number | null;
+  accessibility_note: string | null;
+  airport_note: string | null;
   building_amenities: string[];
   description: string | null;
   photos: string[];
@@ -43,6 +46,12 @@ export interface Unit {
   rent_eur_per_m2_year: number | null;
   service_charge_price_type: ServiceChargePriceType;
   service_charge_eur_per_m2_year: number | null;
+  pricing_model: PricingModel;
+  desk_count: number | null;
+  price_per_desk_month_eur: number | null;
+  space_provider: string | null;
+  meeting_room_note: string | null;
+  parking_ratio: string | null;
   contract_term: string | null;
   contract_term_years: number | null;
   availability: string | null;
@@ -77,6 +86,9 @@ export interface Proposal {
   prepared_at: string;
   status: ProposalStatus;
   notes: string | null;
+  document_type: string;
+  search_area_label: string | null;
+  project_team: { name?: string; role?: string; email?: string; phone?: string }[];
   generated_outputs: { format: string; path: string; generated_at: string }[];
   selected_unit_ids: string[];
 }
@@ -92,12 +104,16 @@ export interface ComparisonRow {
   address: string;
   floor: string | null;
   available_area_m2: number;
+  pricing_model: PricingModel;
   rent_eur_per_m2_year: number | null;
   rent_price_type: RentPriceType;
   service_charge_eur_per_m2_year: number | null;
   service_charge_price_type: ServiceChargePriceType;
   all_in_rate_eur_per_m2_year: number | null;
   estimated_annual_cost_eur: number | null;
+  desk_count: number | null;
+  price_per_desk_month_eur: number | null;
+  monthly_total_eur: number | null;
   is_tbd: boolean;
   energy_label: string | null;
   contract_term: string | null;
