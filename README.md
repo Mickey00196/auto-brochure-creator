@@ -68,6 +68,27 @@ dataset, unchanged) plus one `per_desk_monthly` unit ("Prinseneiland 12"),
 split across 2 regions ("Houthavens Waterfront" / "Houthavens Central") to
 exercise the Per Region grouping.
 
+## Same schema, two ways in
+
+A Building/Unit added through the manual form (`/buildings/new`,
+`/buildings/[id]/units/new`) and one created by pasting a URL
+(`/import`, §7) write to the *exact same* `Building`/`Unit`/`AddOn` ORM
+models — there's no separate "scraped listing" table. `tests/
+test_schema_parity.py` proves this at the API boundary rather than just by
+inspection: it creates one building each way and asserts the JSON responses
+expose identical field sets, so a future change that adds a field only one
+path populates breaks the test immediately instead of silently drifting.
+
+What genuinely differs between the two paths is *coverage*, not *shape* —
+a scraper can only extract what a generic HTML parser can find (see
+Workflow 2 below), so a scraped building may leave more fields as
+`tbd`/`None` than a manual entry would. Every one of those fields is
+still there to fill in by hand afterward via the same forms.
+
+The Proposal builder (`/proposals/new`) reflects the other half of this:
+building the list is entirely check-boxes against the existing Building/Unit
+database — it never asks for building details to be re-typed at that stage.
+
 ## Architecture
 
 ```
@@ -91,11 +112,14 @@ backend/   FastAPI + SQLAlchemy + Pydantic — the actual engine
     export_formats.py      §20 — CSV / Excel / Word
   app/routers/        REST API — one file per resource/concern (incl. imports.py, §7/Workflow 2)
   app/seed/            reference-brochure demo dataset (8 units / 5 buildings / 2 regions)
-  tests/               47 tests — pytest
+  tests/               56 tests — pytest, incl. test_schema_parity.py
 
 frontend/  Next.js (App Router) + TypeScript + Tailwind
-  src/app/             Dashboard (§18), Buildings & Units, Import from URLs, Clients, Proposals (list/new/detail)
-  src/components/       QAPanel, ComparisonTable, ExportPanel, ImportForm — the Proposal detail workspace + Workflow 2
+  src/app/             Dashboard (§18), Buildings & Units (+ manual add-building/add-unit forms),
+                       Import from URLs, Clients, Proposals (list/new/detail)
+  src/components/       BuildingForm, UnitForm, AddOnForm — manual entry (Workflow 1)
+                        QAPanel, ComparisonTable, ExportPanel — the Proposal detail workspace
+                        ImportForm — Workflow 2
 ```
 
 ## Running it
@@ -144,33 +168,43 @@ populated Proposal.
 cd backend && source .venv/bin/activate && python -m pytest
 ```
 
-47 tests, each traceable to either a spec section or a specific line in the
+56 tests, each traceable to either a spec section or a specific line in the
 reference brochure's gap table (§1) — e.g. `test_flags_service_charge_mismatch_between_sources`
-regression-tests the exact €55/€60 conflict shape.
+regression-tests the exact €55/€60 conflict shape, and `test_schema_parity.py`
+regression-tests manual vs. scraped Buildings never diverging into different
+schemas.
 
 ## Workflows (§4)
 
-1. **From the database** — `POST /proposals` with a `client_id` and an ordered
-   `unit_ids` list, or build it interactively at `/proposals/new` in the
-   frontend. Every export reads from that one Proposal record.
+1. **From the database** — build a Building by hand at `/buildings/new`, add
+   Units to it at `/buildings/[id]/units/new`, then select existing Units by
+   clicking checkboxes (never re-typing details) at `/proposals/new` to add
+   them to a Proposal. `POST /buildings`, `POST /units`, and `POST /proposals`
+   cover the same paths via the API directly. Every export reads from that
+   one Proposal record.
 2. **From external URLs** — paste one or more listing URLs at `/import` in the
    frontend, or `POST /imports/urls` directly. Each URL is rendered with the
    pre-installed Playwright Chromium (`fetch_rendered_html`) and parsed with
-   BeautifulSoup (`parse_html`): title, meta description, photos (logo/icon
-   images filtered out), and a best-effort area/price/energy-label reading of
-   the page text — preserving unit-level subdivision ("320 m², units from
-   120 m²" → total + minimum divisible, never collapsed) rather than a single
-   site-specific selector set per source. Every field it can't resolve is
-   stored as `tbd`/omitted rather than blank or guessed (§24) — e.g. address
-   extraction needs per-source selectors this generic parser doesn't have, so
-   it's left `"TBD"` for a human to fill in, not invented. Each URL in a batch
-   succeeds or fails independently, so one bad link doesn't block the rest.
-   Verified end-to-end (real Chromium render → parse → stored Building/Unit,
-   through the actual `/import` page) against a local fixture page; live
-   third-party sites need outbound network access this environment doesn't
-   have, so `fetch_rendered_html` itself isn't exercised by the automated
-   test suite (`parse_html` and the router's create/error-handling logic are —
-   see `tests/test_scraping.py` and `tests/test_imports.py`).
+   BeautifulSoup (`parse_html`): title, address/city (best-effort, from the
+   page title), meta description, photos (logo/icon images filtered out),
+   amenities (keyword-matched against a fixed vocabulary), year built, energy
+   label, and rent/service charge/contract term/parking each anchored to
+   their own keyword in the page text (not just "the first price on the
+   page") — preserving unit-level subdivision ("320 m², units from 120 m²" →
+   total + minimum divisible, never collapsed). This writes to the exact same
+   `Building`/`Unit`/`AddOn` schema Workflow 1 does — see "Same schema, two
+   ways in" above. Every field it can't resolve is stored as `tbd`/omitted
+   rather than blank or guessed (§24) — e.g. an address that doesn't look
+   like "Street Number, City" in the title is left `"TBD"` for a human to
+   fill in via the same building-detail page, not invented. Each URL in a
+   batch succeeds or fails independently, so one bad link doesn't block the
+   rest. Verified end-to-end (real Chromium render → parse → stored
+   Building/Unit/AddOn, through the actual `/import` page) against a local
+   fixture page; live third-party sites need outbound network access this
+   environment doesn't have, so `fetch_rendered_html` itself isn't exercised
+   by the automated test suite (`parse_html` and the router's create/error-
+   handling logic are — see `tests/test_scraping.py` and
+   `tests/test_imports.py`).
 
 ## What's a real implementation vs. a documented stub
 
@@ -181,8 +215,9 @@ verified, and a real Chromium-rendered import against a local fixture page):
 - Data model (incl. dual pricing models), seed data, QA pass, Comparison
   Generator, PPTX/PDF/one-pager generation matching the Market Inventory
   template, CSV/Excel/Word/JSON export, Property Matching, Dashboard, the
-  assistant's regex-based NL parser, URL import (Workflow 2, §7) end-to-end
-  including its frontend page, and the rest of the Next.js frontend.
+  assistant's regex-based NL parser, manual Building/Unit/AddOn entry forms,
+  URL import (Workflow 2, §7) end-to-end including its frontend page and its
+  schema parity with manual entry, and the rest of the Next.js frontend.
 
 Documented, pluggable interfaces with a working deterministic fallback,
 left for a real integration once credentials/network are available:

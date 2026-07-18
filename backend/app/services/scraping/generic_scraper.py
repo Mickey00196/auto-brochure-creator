@@ -63,6 +63,20 @@ def extract_price_raw(text: str) -> str:
     return f"{prefix}€{match.group('value')}"
 
 
+def extract_price_near_keyword(text: str, keyword: str, window: int = 80) -> str:
+    """Same contract as extract_price_raw, but anchored to the text right
+    after `keyword` (e.g. "rent", "service charge", "parking") instead of
+    grabbing the first euro amount anywhere on the page — a page can easily
+    have several prices, and picking the wrong one silently is worse than
+    just returning 'tbd' (§7, §24). Falls back to 'tbd' if the keyword isn't
+    found at all; callers that want a page-wide fallback do that themselves.
+    """
+    match = re.search(re.escape(keyword), text, re.IGNORECASE)
+    if not match:
+        return "tbd"
+    return extract_price_raw(text[match.start() : match.start() + window])
+
+
 def extract_units_from_text(floor_blocks: list[str]) -> list[ScrapedUnit]:
     """`floor_blocks` is one text chunk per floor/unit section of a listing
     page (however the source site groups the DOM). Each block is parsed
@@ -80,8 +94,8 @@ def extract_units_from_text(floor_blocks: list[str]) -> list[ScrapedUnit]:
                 area_m2=total_area,
                 min_divisible_area_m2=min_area,
                 rent_raw=extract_price_raw(block),
-                service_charge_raw=extract_price_raw(block),
-                contract_term_raw="tbd",
+                service_charge_raw=extract_price_near_keyword(block, "service charge"),
+                contract_term_raw=extract_contract_term(block),
             )
         )
     return units
@@ -104,18 +118,79 @@ def fetch_rendered_html(url: str, *, timeout_ms: int = 15_000) -> str:
 
 
 _ENERGY_LABEL_RE = re.compile(r"energy label\s*[:\-]?\s*([A-G]\+*)", re.IGNORECASE)
+_YEAR_BUILT_RE = re.compile(r"(?:built in|year of construction|constructed in)\D{0,10}(\d{4})", re.IGNORECASE)
+_CONTRACT_TERM_RE = re.compile(r"contract term\s*[:\-]?\s*([^.\n]{3,60})", re.IGNORECASE)
 _SKIP_IMAGE_KEYWORDS = ("logo", "icon", "sprite", "avatar", "pixel")
+
+# Fixed vocabulary matched against page text — a real per-source implementation
+# would read a structured amenities list from the DOM; this is the same kind
+# of coarse, keyword-based fallback as the rest of this module, and still
+# beats not extracting amenities at all.
+_AMENITY_PHRASES = [
+    "roof terrace", "rooftop terrace", "bicycle storage", "24/7 access",
+    "on-site concierge", "restaurant", "gym", "spa", "auditorium", "bar",
+    "shared lounge", "high-speed fibre", "furnished", "meeting room",
+    "air conditioning", "raised floors",
+]
+
+
+def extract_amenities(text: str) -> list[str]:
+    """Word-boundary matching, not raw substring containment — "spa" is a
+    real amenity phrase but is also a substring of "per spa[c]e per year",
+    and a false-positive amenity is worse than an incomplete list."""
+    lowered = text.lower()
+    return [
+        phrase.title()
+        for phrase in _AMENITY_PHRASES
+        if re.search(rf"\b{re.escape(phrase)}\b", lowered)
+    ]
+
+
+def extract_year_built(text: str) -> int | None:
+    match = _YEAR_BUILT_RE.search(text)
+    return int(match.group(1)) if match else None
+
+
+def extract_contract_term(text: str) -> str:
+    """Returns raw contract-term text, or 'tbd' — never guessed (§24)."""
+    match = _CONTRACT_TERM_RE.search(text)
+    return match.group(1).strip() if match else "tbd"
+
+
+def guess_address_from_title(title: str) -> tuple[str | None, str | None]:
+    """Best-effort (address, city) guess from a title formatted like
+    "Keizersgracht 100, Amsterdam - Office for lease" — a common listing-page
+    convention, not a guarantee. Returns (None, None) rather than a guess if
+    the first segment doesn't contain a number (i.e. doesn't look like a
+    street address) — a wrong address is worse than an honest TBD (§7, §24).
+    """
+    segments = [s.strip() for s in re.split(r"[,\-–]", title) if s.strip()]
+    if len(segments) < 2:
+        return None, None
+    address_candidate, city_candidate = segments[0], segments[1]
+    if not re.search(r"\d", address_candidate):
+        return None, None
+    return address_candidate, city_candidate
 
 
 def parse_html(html: str, url: str) -> ScrapedListing:
     """Pure parsing over already-fetched HTML — no network dependency, so
     this half is directly testable (tests/test_scraping.py). Extracts what's
     genuinely extractable without site-specific selectors: title, meta
-    description, images, and a best-effort area/price/energy-label reading
-    of the page's visible text. This is deliberately coarse — a real
+    description, images, address (best-effort, from the title), amenities,
+    year built, and a keyword-anchored reading of rent/service
+    charge/contract term/parking. This is deliberately coarse — a real
     per-source implementation would target specific DOM sections per unit
-    (§7) — but it beats returning nothing, and every unresolved field is
-    still 'tbd', never a blank or a guess (§24).
+    (§7) — but it populates the same Building/Unit schema a manually-entered
+    listing does, field for field, rather than a thinner one; whatever this
+    can't resolve is still 'tbd'/omitted, never a blank or a guess (§24).
+
+    Neighbourhood is deliberately NOT inferred here: §5.4's single-source-of-
+    truth design means transit/amenity facts for an area belong on one
+    shared Neighbourhood record, and guessing which existing Neighbourhood a
+    scraped address belongs to (without geocoding) risks silently attaching
+    it to the wrong one — worse than leaving it unassigned for a human to
+    confirm.
     """
     from bs4 import BeautifulSoup
 
@@ -138,8 +213,13 @@ def parse_html(html: str, url: str) -> ScrapedListing:
 
     visible_text = soup.get_text(separator=" ", strip=True)
     total_area, min_area = parse_area_subdivision(visible_text)
-    rent_raw = extract_price_raw(visible_text)
+    rent_raw = extract_price_near_keyword(visible_text, "rent")
+    if rent_raw == "tbd":
+        rent_raw = extract_price_raw(visible_text)  # page-wide fallback if "rent" isn't literally on the page
+    service_charge_raw = extract_price_near_keyword(visible_text, "service charge")
+    parking_price_raw = extract_price_near_keyword(visible_text, "parking")
     energy_match = _ENERGY_LABEL_RE.search(visible_text)
+    address, city = guess_address_from_title(title)
 
     units = [
         ScrapedUnit(
@@ -147,19 +227,23 @@ def parse_html(html: str, url: str) -> ScrapedListing:
             area_m2=total_area,
             min_divisible_area_m2=min_area,
             rent_raw=rent_raw,
-            service_charge_raw="tbd",
-            contract_term_raw="tbd",
+            service_charge_raw=service_charge_raw,
+            contract_term_raw=extract_contract_term(visible_text),
         )
     ]
 
     return ScrapedListing(
         source_url=url,
         title=title,
-        address=None,  # address extraction needs site-specific selectors — left "tbd" downstream rather than guessed
+        address=address,
+        city=city,
         description=description,
         photos=photos,
         units=units,
+        amenities=extract_amenities(visible_text),
         energy_label=energy_match.group(1).upper() if energy_match else None,
+        year_built=extract_year_built(visible_text),
+        parking_price_raw=parking_price_raw,
     )
 
 

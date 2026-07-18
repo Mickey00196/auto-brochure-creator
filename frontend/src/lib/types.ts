@@ -22,16 +22,22 @@ export interface Building {
   postal_code: string | null;
   city: string;
   country: string;
+  latitude: number | null;
+  longitude: number | null;
   neighbourhood_id: string | null;
   submarket: string | null;
   building_type: string | null;
+  year_built: number | null;
+  renovation_year: number | null;
   energy_label: string | null;
+  breeam_rating: string | null;
   total_building_area_m2: number | null;
   accessibility_note: string | null;
   airport_note: string | null;
   building_amenities: string[];
   description: string | null;
   photos: string[];
+  source_url: string | null;
   units: Unit[];
 }
 

@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 from app.services.scraping.generic_scraper import (
+    extract_amenities,
+    extract_contract_term,
+    extract_price_near_keyword,
     extract_price_raw,
     extract_units_from_text,
+    extract_year_built,
+    guess_address_from_title,
     parse_area_subdivision,
     parse_html,
 )
@@ -66,7 +71,10 @@ _SAMPLE_HTML = """
 <body>
   <img src="/photos/exterior.jpg">
   <img src="/icons/logo.png">
-  <p>Total area 320 m², units from 120 m². Rent from €260 per m² per year. Energy label A.</p>
+  <p>Total area 320 m², units from 120 m². Rent from €260 per m² per year.
+  Service charge €55 per m² per year. Contract term: 5 years, negotiable.
+  Parking €2,200 per space per year. Energy label A. Built in 2015.
+  Amenities include a roof terrace and bicycle storage.</p>
 </body>
 </html>
 """
@@ -95,3 +103,59 @@ def test_parse_html_missing_area_stays_none_not_zero():
     listing = parse_html("<html><title>No pricing info</title><body>Nothing here.</body></html>", "https://x.test")
     assert listing.units[0].area_m2 is None
     assert listing.units[0].rent_raw == "tbd"
+
+
+def test_parse_html_populates_full_schema_not_a_thinner_one():
+    """The scraped listing should fill in the same fields a manual entry
+    would — service charge, contract term, amenities, year built, parking,
+    and a best-effort address/city — not just area and rent."""
+    listing = parse_html(_SAMPLE_HTML, "https://example-brokerage.test/listings/100")
+    assert listing.address == "Keizersgracht 100"
+    assert listing.city == "Amsterdam"
+    assert listing.year_built == 2015
+    assert listing.parking_price_raw == "€2,200"
+    assert set(listing.amenities) >= {"Roof Terrace", "Bicycle Storage"}
+
+    unit = listing.units[0]
+    assert unit.service_charge_raw == "€55"
+    assert unit.contract_term_raw == "5 years, negotiable"
+
+
+def test_guess_address_from_title_requires_a_number():
+    """A wrong address is worse than an honest TBD — refuse to guess when
+    the first segment doesn't look like a street address (§7, §24)."""
+    assert guess_address_from_title("Keizersgracht 100, Amsterdam - Office for lease") == ("Keizersgracht 100", "Amsterdam")
+    assert guess_address_from_title("Premium Offices For Lease In Amsterdam") == (None, None)
+    assert guess_address_from_title("No comma here") == (None, None)
+
+
+def test_extract_price_near_keyword_ignores_unrelated_prices():
+    text = "Parking €2,200 per space. Rent €260 per m². Service charge €55 per m²."
+    assert extract_price_near_keyword(text, "rent") == "€260"
+    assert extract_price_near_keyword(text, "service charge") == "€55"
+    assert extract_price_near_keyword(text, "parking") == "€2,200"
+    assert extract_price_near_keyword(text, "deposit") == "tbd"
+
+
+def test_extract_year_built():
+    assert extract_year_built("This building was built in 1998.") == 1998
+    assert extract_year_built("Year of construction: 2021.") == 2021
+    assert extract_year_built("No date mentioned.") is None
+
+
+def test_extract_contract_term_tbd_when_absent():
+    assert extract_contract_term("Contract term: 5 years, negotiable.") == "5 years, negotiable"
+    assert extract_contract_term("Nothing about lease length here.") == "tbd"
+
+
+def test_extract_amenities_matches_known_vocabulary_only():
+    amenities = extract_amenities("Featuring a roof terrace, bicycle storage, and a totally made-up feature.")
+    assert set(amenities) == {"Roof Terrace", "Bicycle Storage"}
+
+
+def test_extract_amenities_uses_word_boundaries_not_substring_match():
+    """Regression test: "spa" is a real amenity phrase but is also a
+    substring of "space" — raw `phrase in text` containment falsely matched
+    "per spa[c]e per year" as a spa amenity."""
+    amenities = extract_amenities("Parking is available: €2,200 per space per year.")
+    assert "Spa" not in amenities

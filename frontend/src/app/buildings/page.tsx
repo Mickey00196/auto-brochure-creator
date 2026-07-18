@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, PageHeader } from "@/components/ui";
 import { formatArea, formatUnitHeadlinePrice } from "@/lib/format";
 
 export default async function BuildingsPage() {
@@ -11,7 +11,12 @@ export default async function BuildingsPage() {
       <PageHeader
         eyebrow="§5.1 / §5.2"
         title="Buildings & Units"
-        description="One Building can list several leasable Units — different floors, prices, and delivery conditions — rather than collapsing everything into a single record."
+        description="One Building can list several leasable Units — different floors, prices, and delivery conditions — rather than collapsing everything into a single record. Added manually or by pasting a URL, every building lands in this same list."
+        actions={
+          <Link href="/buildings/new">
+            <Button>+ Add Building</Button>
+          </Link>
+        }
       />
 
       {buildings.length === 0 && (
@@ -29,13 +34,20 @@ export default async function BuildingsPage() {
           <Card key={building.building_id}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold">{building.name}</h2>
+                <Link href={`/buildings/${building.building_id}`} className="text-xl font-semibold hover:text-accent hover:underline">
+                  {building.name}
+                </Link>
                 <p className="text-sm text-muted">
                   {building.address}, {building.city} · {building.building_type ?? "Office"}
                   {building.energy_label && ` · Energy label ${building.energy_label}`}
                 </p>
               </div>
-              <Badge>{building.units.length} unit{building.units.length === 1 ? "" : "s"}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge>{building.units.length} unit{building.units.length === 1 ? "" : "s"}</Badge>
+                <Link href={`/buildings/${building.building_id}`} className="text-xs font-semibold text-accent hover:underline">
+                  Manage →
+                </Link>
+              </div>
             </div>
 
             {building.building_amenities.length > 0 && (

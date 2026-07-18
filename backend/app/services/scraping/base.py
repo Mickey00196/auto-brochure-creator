@@ -27,6 +27,7 @@ class ScrapedListing:
     source_url: str
     title: str
     address: str | None
+    city: str | None
     description: str
     photos: list[str] = field(default_factory=list)
     floorplans: list[str] = field(default_factory=list)
@@ -34,9 +35,13 @@ class ScrapedListing:
     units: list[ScrapedUnit] = field(default_factory=list)
     amenities: list[str] = field(default_factory=list)
     energy_label: str | None = None
+    year_built: int | None = None
     broker_name: str | None = None
     broker_email: str | None = None
     transit_notes: list[str] = field(default_factory=list)
+    # Building-level parking, mirroring AddOn(building_id=..., name="Parking space")
+    # — kept as a raw string like unit prices ("tbd" if not found, never guessed).
+    parking_price_raw: str | None = None
 
 
 class Scraper(Protocol):

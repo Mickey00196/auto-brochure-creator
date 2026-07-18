@@ -13,16 +13,20 @@ def _fake_listing_with_unit(url: str) -> ScrapedListing:
     return ScrapedListing(
         source_url=url,
         title="Test Building",
-        address=None,
+        address="Teststraat 1",
+        city="Amsterdam",
         description="A test listing",
         photos=["https://example.test/photo.jpg"],
         units=[
             ScrapedUnit(
                 floor=None, area_m2=250, min_divisible_area_m2=None,
-                rent_raw="€200", service_charge_raw="tbd", contract_term_raw="tbd",
+                rent_raw="€200", service_charge_raw="€50", contract_term_raw="5 years",
             )
         ],
+        amenities=["Roof Terrace"],
         energy_label="A",
+        year_built=2020,
+        parking_price_raw="€2,000",
     )
 
 
@@ -31,6 +35,7 @@ def _fake_listing_without_area(url: str) -> ScrapedListing:
         source_url=url,
         title="No Area Building",
         address=None,
+        city=None,
         description="",
         units=[
             ScrapedUnit(
@@ -42,6 +47,11 @@ def _fake_listing_without_area(url: str) -> ScrapedListing:
 
 
 def test_import_creates_building_and_unit(client, monkeypatch):
+    """Every field the scraper resolved should land in the same
+    Building/Unit/AddOn schema a manual entry would use — not just area and
+    rent, but service charge, contract term, amenities, year built, and
+    parking, which earlier only round-tripped as far as the ScrapedListing
+    dataclass and were silently dropped before reaching the database."""
     monkeypatch.setattr(imports_router, "scrape", _fake_listing_with_unit)
     r = client.post("/imports/urls", json={"urls": ["https://example.test/listing-1"]})
     assert r.status_code == 200
@@ -52,9 +62,23 @@ def test_import_creates_building_and_unit(client, monkeypatch):
 
     buildings = client.get("/buildings").json()
     match = next(b for b in buildings if b["building_id"] == body[0]["building_id"])
-    assert len(match["units"]) == 1
-    assert match["units"][0]["available_area_m2"] == 250
-    assert match["units"][0]["rent_eur_per_m2_year"] == 200
+    assert match["address"] == "Teststraat 1"
+    assert match["city"] == "Amsterdam"
+    assert match["year_built"] == 2020
+    assert match["building_amenities"] == ["Roof Terrace"]
+
+    unit = match["units"][0]
+    assert unit["available_area_m2"] == 250
+    assert unit["rent_eur_per_m2_year"] == 200
+    assert unit["rent_price_type"] == "fixed"
+    assert unit["service_charge_eur_per_m2_year"] == 50
+    assert unit["service_charge_price_type"] == "fixed"
+    assert unit["contract_term"] == "5 years"
+
+    addons = client.get(f"/addons?building_id={match['building_id']}").json()
+    assert len(addons) == 1
+    assert addons[0]["name"] == "Parking space"
+    assert addons[0]["price"] == 2000
 
 
 def test_import_without_area_creates_building_but_no_unit(client, monkeypatch):

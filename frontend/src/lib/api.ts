@@ -1,4 +1,5 @@
 import type {
+  AddOn,
   Building,
   Client,
   ComparisonRow,
@@ -32,9 +33,23 @@ export const api = {
 
   buildings: () => request<Building[]>("/buildings"),
   building: (id: string) => request<Building>(`/buildings/${id}`),
+  createBuilding: (payload: Record<string, unknown>) =>
+    request<Building>("/buildings", { method: "POST", body: JSON.stringify(payload) }),
 
   units: (buildingId?: string) =>
     request<Unit[]>(`/units${buildingId ? `?building_id=${buildingId}` : ""}`),
+  createUnit: (payload: Record<string, unknown>) =>
+    request<Unit>("/units", { method: "POST", body: JSON.stringify(payload) }),
+
+  addons: (params: { unitId?: string; buildingId?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.unitId) query.set("unit_id", params.unitId);
+    if (params.buildingId) query.set("building_id", params.buildingId);
+    const qs = query.toString();
+    return request<AddOn[]>(`/addons${qs ? `?${qs}` : ""}`);
+  },
+  createAddOn: (payload: Record<string, unknown>) =>
+    request<AddOn>("/addons", { method: "POST", body: JSON.stringify(payload) }),
 
   neighbourhoods: () => request<Neighbourhood[]>("/neighbourhoods"),
 
