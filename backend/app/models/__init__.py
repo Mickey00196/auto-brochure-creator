@@ -12,6 +12,7 @@ from app.models.enums import (
 from app.models.neighbourhood import Neighbourhood
 from app.models.proposal import Proposal, ProposalUnit
 from app.models.unit import Unit
+from app.models.user import User
 
 __all__ = [
     "AddOn",
@@ -27,4 +28,5 @@ __all__ = [
     "Proposal",
     "ProposalUnit",
     "Unit",
+    "User",
 ]

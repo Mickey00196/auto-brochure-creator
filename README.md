@@ -111,15 +111,30 @@ backend/   FastAPI + SQLAlchemy + Pydantic — the actual engine
       theme.py                §22 — white-labelable palette
     export_formats.py      §20 — CSV / Excel / Word
   app/routers/        REST API — one file per resource/concern (incl. imports.py, §7/Workflow 2)
+  app/auth.py           email/password login, JWT issuing/verification — every route below
+                        requires a logged-in user (see "Team accounts" below)
+  app/cli.py             admin-only account provisioning (no public signup)
   app/seed/            reference-brochure demo dataset (8 units / 5 buildings / 2 regions)
-  tests/               56 tests — pytest, incl. test_schema_parity.py
+  tests/               64 tests — pytest, incl. test_schema_parity.py, test_auth.py
+  Dockerfile           installs libreoffice-impress + playwright chromium, runs uvicorn
 
 frontend/  Next.js (App Router) + TypeScript + Tailwind
   src/app/             Dashboard (§18), Buildings & Units (+ manual add-building/add-unit forms),
-                       Import from URLs, Clients, Proposals (list/new/detail)
+                       Import from URLs, Clients, Proposals (list/new/detail), /login
+  src/app/api/           login/logout Route Handlers (set/clear the httpOnly session cookie),
+                        proxy/[...path] — every browser-side request goes through this so the
+                        session JWT never reaches client JS (see "Team accounts" below)
   src/components/       BuildingForm, UnitForm, AddOnForm — manual entry (Workflow 1)
                         QAPanel, ComparisonTable, ExportPanel — the Proposal detail workspace
                         ImportForm — Workflow 2
+  src/lib/api.ts          client components' API client — calls the same-origin proxy
+  src/lib/serverApi.ts    Server Components' API client — calls the backend directly,
+                          reading the session cookie server-side (never imported by client code)
+  src/proxy.ts            the one auth gate: no valid session cookie, no page render
+  Dockerfile             multi-stage build using `output: "standalone"`
+
+docker-compose.yml    local parity with production: Postgres + both Docker images
+render.yaml            one-click Render Blueprint (Postgres + both services)
 ```
 
 ## Running it
@@ -149,18 +164,27 @@ never fails the export.
 Point `DATABASE_URL` at Postgres (Supabase, per the spec's intended stack) in
 production; SQLite is the zero-config default for local dev.
 
+Every route except `/health` and `/auth/login` requires a logged-in user — see
+"Team accounts" below. Set `JWT_SECRET_KEY` to a real random value in any
+deployment reachable over a network (`python -c "import secrets;
+print(secrets.token_hex(32))"`); the code falls back to an insecure hardcoded
+value if unset, purely so `pytest` and local `--reload` runs work with zero
+setup.
+
 ### Frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL, defaults to http://localhost:8000
+cp .env.example .env.local   # INTERNAL_API_BASE_URL, defaults to http://localhost:8000
 npm run dev                  # http://localhost:3000
 ```
 
-Click **"Load reference brochure demo data"** on the dashboard to seed the
-8-unit, 5-building, 2-region Amsterdam dataset and jump straight into a
-populated Proposal.
+The browser never talks to the FastAPI backend directly — `INTERNAL_API_BASE_URL`
+is a server-only env var (no `NEXT_PUBLIC_` prefix, so it never ships to client
+JS) used by Server Components and by the `/api/proxy/*` Route Handler that
+every client-side request goes through instead. See "Team accounts" below for
+why, and for how to log in.
 
 ### Tests
 
@@ -168,11 +192,86 @@ populated Proposal.
 cd backend && source .venv/bin/activate && python -m pytest
 ```
 
-56 tests, each traceable to either a spec section or a specific line in the
+64 tests, each traceable to either a spec section or a specific line in the
 reference brochure's gap table (§1) — e.g. `test_flags_service_charge_mismatch_between_sources`
 regression-tests the exact €55/€60 conflict shape, and `test_schema_parity.py`
 regression-tests manual vs. scraped Buildings never diverging into different
 schemas.
+
+## Team accounts (auth)
+
+There is no public signup — accounts are provisioned by whoever's running the
+deployment, then colleagues log in at `/login` with the email/password they
+were given. Every logged-in user sees and can edit every Building, Client, and
+Proposal; there's no per-user data scoping, only a "you must be logged in" gate
+in front of the whole app (this is a small-team internal tool, not a
+multi-tenant product).
+
+Provision an account:
+
+```bash
+cd backend
+python -m app.cli create-user --email sam@yourcompany.example --name "Sam de Boer" --password "..." --role broker
+python -m app.cli list-users
+```
+
+Run this with `DATABASE_URL` pointed at whichever database the deployment
+actually uses — locally that's the SQLite default; in production, set
+`DATABASE_URL` in your shell to the same Postgres connection string the
+backend service uses (Render: copy it from the backend service's environment
+tab, or `render ssh proposal-engine-backend` and run the command there
+directly against the already-configured environment).
+
+**How the login itself works**, since it's easy to get wrong for an app split
+across two services: the backend issues a JWT on `POST /auth/login`. The
+frontend's `/api/login` Route Handler is the only thing that ever sees that
+token — it stores it in an `httpOnly` cookie, so it's never readable by
+browser JS at all (an XSS bug can't read it out of `localStorage` or
+`document.cookie`, unlike a Bearer-token-in-the-browser approach). Server
+Components read that cookie directly and call the backend server-to-server
+(`src/lib/serverApi.ts`); client components instead call a same-origin
+`/api/proxy/[...path]` Route Handler that reads the cookie and forwards the
+request with the bearer token attached (`src/lib/api.ts`) — so client-side
+code never has the token to leak in the first place. `src/proxy.ts` is the
+single gate: no valid, unexpired session cookie means no page render,
+redirect to `/login`, checked before anything else runs.
+
+## Deploying it
+
+**Render** (recommended — `render.yaml` in the repo root is a one-click
+Blueprint):
+
+1. Push this repo to GitHub.
+2. Render dashboard → **New > Blueprint** → point it at the repo. This
+   provisions a managed Postgres database, the backend (Docker, from
+   `backend/Dockerfile`), and the frontend (Docker, from
+   `frontend/Dockerfile`) — `DATABASE_URL` and `INTERNAL_API_BASE_URL` are
+   wired up automatically between them, and `JWT_SECRET_KEY` is auto-generated.
+3. Optionally set `GOOGLE_MAPS_API_KEY` on the backend service (dashboard →
+   Environment) — region map pages fall back to a labeled placeholder without
+   it, nothing breaks.
+4. Provision your colleagues' accounts (see "Team accounts" above).
+
+The `free` plan is the right starting point for a backtest: free web services
+spin down after 15 minutes of inactivity (the first request after a lull
+takes ~30s to wake back up) and the free Postgres database expires after 30
+days — fine for kicking the tires, not for something colleagues rely on
+long-term. Bump `plan:` in `render.yaml` when you're ready to commit to it.
+
+**Anywhere else that runs Docker** (a VPS, another PaaS, your own
+Kubernetes): `docker-compose.yml` in the repo root runs the same two images
+plus a local Postgres for parity testing —
+
+```bash
+JWT_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))") docker compose up --build
+```
+
+— then provision accounts the same way, against that container's database.
+Whatever platform you use, the app must be served over HTTPS: the session
+cookie is marked `Secure` automatically once it detects the request came in
+over HTTPS (directly, or via a `x-forwarded-proto: https` header from a
+reverse proxy — the standard most PaaS load balancers already set), and a
+`Secure` cookie is silently dropped by the browser over plain HTTP.
 
 ## Workflows (§4)
 
@@ -218,6 +317,12 @@ verified, and a real Chromium-rendered import against a local fixture page):
   assistant's regex-based NL parser, manual Building/Unit/AddOn entry forms,
   URL import (Workflow 2, §7) end-to-end including its frontend page and its
   schema parity with manual entry, and the rest of the Next.js frontend.
+- Team login (§19) — email/password auth, JWT-gated API, httpOnly-cookie
+  session, admin-provisioned accounts. Verified with a real Playwright
+  browser run against both servers: wrong password rejected, correct login
+  works, a client-side mutation and a file export both succeed through the
+  authenticated proxy, logout revokes access, unauthenticated visits to any
+  page redirect to `/login`.
 
 Documented, pluggable interfaces with a working deterministic fallback,
 left for a real integration once credentials/network are available:

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
+import { PROXY_BASE_URL } from "@/lib/api";
 import { Button } from "@/components/ui";
 
 type ExportFormat = "pdf" | "pptx" | "one-pager" | "csv" | "excel" | "word";
@@ -25,8 +25,12 @@ export function ExportPanel({ proposalId, proposalTitle, exportReady }: { propos
     setError(null);
     try {
       const force = gated && (forceExport || exportReady);
-      const url = `${API_BASE_URL}/proposals/${proposalId}/export/${format}${force ? "?force=true" : ""}`;
+      const url = `${PROXY_BASE_URL}/proposals/${proposalId}/export/${format}${force ? "?force=true" : ""}`;
       const res = await fetch(url, { method: "POST" });
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
       if (!res.ok) {
         const body = await res.text();
         throw new Error(res.status === 409 ? "Blocked by QA — resolve or acknowledge TBD fields first, or check 'force export'." : body);

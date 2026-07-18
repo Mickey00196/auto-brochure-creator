@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { serverApi as api } from "@/lib/serverApi";
 import { PageHeader } from "@/components/ui";
 import { BuildingForm } from "@/components/BuildingForm";
 

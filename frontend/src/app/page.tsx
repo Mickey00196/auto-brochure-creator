@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { serverApi as api } from "@/lib/serverApi";
 import { Card, PageHeader, StatTile } from "@/components/ui";
 import { SeedDemoButton } from "@/components/SeedDemoButton";
 

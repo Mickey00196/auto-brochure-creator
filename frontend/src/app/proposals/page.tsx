@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { serverApi as api } from "@/lib/serverApi";
 import { Badge, Card, PageHeader, Button } from "@/components/ui";
 
 const STATUS_TONE: Record<string, "default" | "accent" | "warn" | "success"> = {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { api } from "@/lib/api";
+import { serverApi as api } from "@/lib/serverApi";
 import { Badge, Button, Card, PageHeader } from "@/components/ui";
 import { AddOnForm } from "@/components/AddOnForm";
 import { formatArea, formatUnitHeadlinePrice } from "@/lib/format";

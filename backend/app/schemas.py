@@ -12,6 +12,7 @@ from app.models.enums import (
     ProposalStatus,
     RentPriceType,
     ServiceChargePriceType,
+    UserRole,
 )
 
 # ─────────────────────────────────────────── Neighbourhood ───────────────────────────────────────────
@@ -210,3 +211,22 @@ class ProposalWithUnits(ProposalOut):
 BuildingWithUnits.model_rebuild()
 UnitWithBuilding.model_rebuild()
 ProposalWithUnits.model_rebuild()
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    user_id: str
+    email: str
+    name: str
+    role: UserRole
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut

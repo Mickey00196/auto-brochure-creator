@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { api } from "@/lib/api";
+import { serverApi as api } from "@/lib/serverApi";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { ProposalWorkspace } from "@/components/ProposalWorkspace";

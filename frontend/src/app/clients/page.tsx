@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { serverApi as api } from "@/lib/serverApi";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function ClientsPage() {

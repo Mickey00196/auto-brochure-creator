@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { serverApi as api } from "@/lib/serverApi";
 import { Badge, Button, Card, PageHeader } from "@/components/ui";
 import { formatArea, formatUnitHeadlinePrice } from "@/lib/format";
 
