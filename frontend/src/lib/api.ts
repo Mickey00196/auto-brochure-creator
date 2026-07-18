@@ -3,6 +3,7 @@ import type {
   Client,
   ComparisonRow,
   DashboardData,
+  ImportResult,
   MatchResult,
   Neighbourhood,
   Proposal,
@@ -63,6 +64,9 @@ export const api = {
     request<MatchResult[]>("/match", { method: "POST", body: JSON.stringify(criteria) }),
 
   seedDemo: () => request<ProposalWithUnits>("/seed/demo", { method: "POST" }),
+
+  importUrls: (urls: string[]) =>
+    request<ImportResult[]>("/imports/urls", { method: "POST", body: JSON.stringify({ urls }) }),
 
   exportUrl: (proposalId: string, format: "pdf" | "pptx" | "one-pager" | "csv" | "excel" | "word", force = false) =>
     `${API_BASE_URL}/proposals/${proposalId}/export/${format}${force ? "?force=true" : ""}`,

@@ -89,13 +89,13 @@ backend/   FastAPI + SQLAlchemy + Pydantic — the actual engine
       one_pager.py           §15 — single-slide executive summary
       theme.py                §22 — white-labelable palette
     export_formats.py      §20 — CSV / Excel / Word
-  app/routers/        REST API — one file per resource/concern
+  app/routers/        REST API — one file per resource/concern (incl. imports.py, §7/Workflow 2)
   app/seed/            reference-brochure demo dataset (8 units / 5 buildings / 2 regions)
-  tests/               41 tests — pytest
+  tests/               47 tests — pytest
 
 frontend/  Next.js (App Router) + TypeScript + Tailwind
-  src/app/             Dashboard (§18), Buildings & Units, Clients, Proposals (list/new/detail)
-  src/components/       QAPanel, ComparisonTable, ExportPanel — the Proposal detail workspace
+  src/app/             Dashboard (§18), Buildings & Units, Import from URLs, Clients, Proposals (list/new/detail)
+  src/components/       QAPanel, ComparisonTable, ExportPanel, ImportForm — the Proposal detail workspace + Workflow 2
 ```
 
 ## Running it
@@ -144,7 +144,7 @@ populated Proposal.
 cd backend && source .venv/bin/activate && python -m pytest
 ```
 
-41 tests, each traceable to either a spec section or a specific line in the
+47 tests, each traceable to either a spec section or a specific line in the
 reference brochure's gap table (§1) — e.g. `test_flags_service_charge_mismatch_between_sources`
 regression-tests the exact €55/€60 conflict shape.
 
@@ -153,24 +153,36 @@ regression-tests the exact €55/€60 conflict shape.
 1. **From the database** — `POST /proposals` with a `client_id` and an ordered
    `unit_ids` list, or build it interactively at `/proposals/new` in the
    frontend. Every export reads from that one Proposal record.
-2. **From external URLs** — `app/services/scraping/generic_scraper.py`
-   implements the subdivision-preserving parsing logic ("581 m², units from
-   150 m²" → total + minimum divisible, never collapsed) as pure, tested
-   functions. The live-fetch half (`fetch_rendered_html`, via the
-   pre-installed Playwright Chromium) needs outbound network access to
-   arbitrary third-party listing sites, which this environment doesn't have —
-   it's implemented and documented but not exercised by the test suite.
+2. **From external URLs** — paste one or more listing URLs at `/import` in the
+   frontend, or `POST /imports/urls` directly. Each URL is rendered with the
+   pre-installed Playwright Chromium (`fetch_rendered_html`) and parsed with
+   BeautifulSoup (`parse_html`): title, meta description, photos (logo/icon
+   images filtered out), and a best-effort area/price/energy-label reading of
+   the page text — preserving unit-level subdivision ("320 m², units from
+   120 m²" → total + minimum divisible, never collapsed) rather than a single
+   site-specific selector set per source. Every field it can't resolve is
+   stored as `tbd`/omitted rather than blank or guessed (§24) — e.g. address
+   extraction needs per-source selectors this generic parser doesn't have, so
+   it's left `"TBD"` for a human to fill in, not invented. Each URL in a batch
+   succeeds or fails independently, so one bad link doesn't block the rest.
+   Verified end-to-end (real Chromium render → parse → stored Building/Unit,
+   through the actual `/import` page) against a local fixture page; live
+   third-party sites need outbound network access this environment doesn't
+   have, so `fetch_rendered_html` itself isn't exercised by the automated
+   test suite (`parse_html` and the router's create/error-handling logic are —
+   see `tests/test_scraping.py` and `tests/test_imports.py`).
 
 ## What's a real implementation vs. a documented stub
 
 Fully implemented, tested, and exercised end-to-end (backend tests + a live
 browser run against both servers, including a downloaded PPTX opened and
-verified):
+verified, and a real Chromium-rendered import against a local fixture page):
 
 - Data model (incl. dual pricing models), seed data, QA pass, Comparison
   Generator, PPTX/PDF/one-pager generation matching the Market Inventory
   template, CSV/Excel/Word/JSON export, Property Matching, Dashboard, the
-  assistant's regex-based NL parser, and the full Next.js frontend.
+  assistant's regex-based NL parser, URL import (Workflow 2, §7) end-to-end
+  including its frontend page, and the rest of the Next.js frontend.
 
 Documented, pluggable interfaces with a working deterministic fallback,
 left for a real integration once credentials/network are available:

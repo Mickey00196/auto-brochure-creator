@@ -8,13 +8,15 @@ Jinja2==3.1.6
 python-multipart==0.0.32
 openpyxl==3.1.5
 python-docx==1.2.0
+beautifulsoup4==4.15.0
 
 # test-only
 pytest==9.1.1
 httpx==0.28.1
 
-# optional — only imported by app/services/scraping/generic_scraper.py's
-# fetch_rendered_html, which requires outbound network access to arbitrary
-# listing sites and isn't exercised by the test suite. `pip install
-# playwright && playwright install chromium` to enable live scraping.
-# playwright
+# §7 scraping — fetch_rendered_html needs a Chromium binary available at
+# runtime (`playwright install chromium`, or point PLAYWRIGHT_BROWSERS_PATH
+# at a pre-installed one) and outbound network access to arbitrary listing
+# sites. Not exercised by the test suite, which covers parse_html/
+# parse_area_subdivision/extract_price_raw as pure functions instead.
+playwright==1.61.0

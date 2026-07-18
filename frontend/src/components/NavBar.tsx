@@ -3,6 +3,7 @@ import Link from "next/link";
 const LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/buildings", label: "Buildings & Units" },
+  { href: "/import", label: "Import from URLs" },
   { href: "/clients", label: "Clients" },
   { href: "/proposals", label: "Proposals" },
 ];

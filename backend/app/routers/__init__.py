@@ -6,6 +6,7 @@ from app.routers import (
     comparison,
     dashboard,
     export,
+    imports,
     match,
     neighbourhoods,
     proposals,
@@ -28,4 +29,5 @@ all_routers = [
     dashboard.router,
     assistant.router,
     seed.router,
+    imports.router,
 ]

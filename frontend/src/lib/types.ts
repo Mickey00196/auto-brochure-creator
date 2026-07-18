@@ -156,3 +156,11 @@ export interface MatchResult {
   score: number;
   reasons: string[];
 }
+
+export interface ImportResult {
+  url: string;
+  status: "created" | "error";
+  building_id: string | null;
+  title: string | null;
+  message: string | null;
+}

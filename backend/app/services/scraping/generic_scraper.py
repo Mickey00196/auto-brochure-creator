@@ -14,6 +14,7 @@ reference brochure.
 from __future__ import annotations
 
 import re
+from urllib.parse import urljoin
 
 from app.services.scraping.base import ScrapedListing, ScrapedUnit
 
@@ -102,20 +103,71 @@ def fetch_rendered_html(url: str, *, timeout_ms: int = 15_000) -> str:
             browser.close()
 
 
-def scrape(url: str) -> ScrapedListing:
-    """End-to-end scrape: fetch + parse. Network-dependent; see
-    fetch_rendered_html. Downstream AI normalization (§8) and the QA pass
-    (§8) should run on the returned ScrapedListing before it becomes stored
-    Building/Unit records.
+_ENERGY_LABEL_RE = re.compile(r"energy label\s*[:\-]?\s*([A-G]\+*)", re.IGNORECASE)
+_SKIP_IMAGE_KEYWORDS = ("logo", "icon", "sprite", "avatar", "pixel")
+
+
+def parse_html(html: str, url: str) -> ScrapedListing:
+    """Pure parsing over already-fetched HTML — no network dependency, so
+    this half is directly testable (tests/test_scraping.py). Extracts what's
+    genuinely extractable without site-specific selectors: title, meta
+    description, images, and a best-effort area/price/energy-label reading
+    of the page's visible text. This is deliberately coarse — a real
+    per-source implementation would target specific DOM sections per unit
+    (§7) — but it beats returning nothing, and every unresolved field is
+    still 'tbd', never a blank or a guess (§24).
     """
-    html = fetch_rendered_html(url)
-    # A production implementation would use BeautifulSoup (per §21) to select
-    # DOM sections per floor/unit; kept minimal here since real-site markup
-    # varies per source and isn't available to develop against in this
-    # environment.
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    title_tag = soup.find("meta", property="og:title") or soup.find("title")
+    title = (title_tag.get("content") if title_tag and title_tag.get("content") else title_tag.get_text(strip=True)) if title_tag else ""
+
+    desc_tag = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", property="og:description")
+    description = desc_tag.get("content", "").strip() if desc_tag else ""
+
+    photos: list[str] = []
+    for img in soup.find_all("img"):
+        src = img.get("src") or img.get("data-src")
+        if not src or any(k in src.lower() for k in _SKIP_IMAGE_KEYWORDS):
+            continue
+        photos.append(urljoin(url, src))
+        if len(photos) >= 8:
+            break
+
+    visible_text = soup.get_text(separator=" ", strip=True)
+    total_area, min_area = parse_area_subdivision(visible_text)
+    rent_raw = extract_price_raw(visible_text)
+    energy_match = _ENERGY_LABEL_RE.search(visible_text)
+
+    units = [
+        ScrapedUnit(
+            floor=None,
+            area_m2=total_area,
+            min_divisible_area_m2=min_area,
+            rent_raw=rent_raw,
+            service_charge_raw="tbd",
+            contract_term_raw="tbd",
+        )
+    ]
+
     return ScrapedListing(
         source_url=url,
-        title="",
-        address=None,
-        description=html[:0],  # placeholder — real DOM parsing plugs in here
+        title=title,
+        address=None,  # address extraction needs site-specific selectors — left "tbd" downstream rather than guessed
+        description=description,
+        photos=photos,
+        units=units,
+        energy_label=energy_match.group(1).upper() if energy_match else None,
     )
+
+
+def scrape(url: str) -> ScrapedListing:
+    """End-to-end scrape: fetch (network-dependent, see fetch_rendered_html)
+    + parse (pure, see parse_html). Downstream AI normalization (§8) and the
+    QA pass (§8) should run on the returned ScrapedListing before it becomes
+    stored Building/Unit records.
+    """
+    html = fetch_rendered_html(url)
+    return parse_html(html, url)
