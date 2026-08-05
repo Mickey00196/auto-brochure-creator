@@ -133,6 +133,10 @@ frontend/  Next.js (App Router) + TypeScript + Tailwind
   src/proxy.ts            the one auth gate: no valid session cookie, no page render
   Dockerfile             multi-stage build using `output: "standalone"`
 
+extension/ Chrome extension (Manifest V3) — one-click "import this listing" from
+           the page you're viewing, via the same /imports/urls endpoint as /import.
+           Install/troubleshooting: extension/README.md
+
 docker-compose.yml    local parity with production: Postgres + both Docker images
 render.yaml            one-click Render Blueprint (Postgres + both services)
 ```
@@ -282,7 +286,9 @@ reverse proxy — the standard most PaaS load balancers already set), and a
    cover the same paths via the API directly. Every export reads from that
    one Proposal record.
 2. **From external URLs** — paste one or more listing URLs at `/import` in the
-   frontend, or `POST /imports/urls` directly. Each URL is rendered with the
+   frontend, `POST /imports/urls` directly, or click the Chrome extension
+   (`extension/` — see its README for install steps) while viewing a listing
+   to import the current page without copy-pasting anything. Each URL is rendered with the
    pre-installed Playwright Chromium (`fetch_rendered_html`) and parsed with
    BeautifulSoup (`parse_html`): title, address/city (best-effort, from the
    page title), meta description, photos (logo/icon images filtered out),

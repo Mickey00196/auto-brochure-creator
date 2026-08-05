@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Proposal Engine Importer",
+  "version": "1.0.0",
+  "description": "Import the commercial listing you're viewing (funda in business, etc.) into the Real Estate Proposal Engine with one click.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Import this listing into the Proposal Engine"
+  },
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
