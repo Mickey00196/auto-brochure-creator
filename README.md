@@ -242,8 +242,34 @@ redirect to `/login`, checked before anything else runs.
 
 ## Deploying it
 
-**Render** (recommended — `render.yaml` in the repo root is a one-click
-Blueprint):
+**Railway** (`backend/railway.json` / `frontend/railway.json` carry the
+build + healthcheck config; you create the services and point each at its
+folder):
+
+1. Push this repo to GitHub.
+2. [railway.app](https://railway.app) → **New Project** → **Deploy from
+   GitHub repo** → pick this repo. In the service that gets created, open
+   **Settings → Source** and set **Root Directory** to `backend`.
+3. In the same project: **Create → Database → PostgreSQL**.
+4. On the backend service → **Variables**, add:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (a reference to the
+     database service — type it exactly like that)
+   - `JWT_SECRET_KEY` = a long random string
+   - `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_NAME` /
+     `BOOTSTRAP_ADMIN_PASSWORD` = your own first login account — created
+     automatically on first boot since Railway offers no shell to run
+     `app.cli create-user`. Remove these variables once you've logged in
+     (the account persists; existing accounts are never modified by them).
+   - optionally `GOOGLE_MAPS_API_KEY`
+5. Backend service → **Settings → Networking → Generate Domain** (target
+   port 8000). Note the URL.
+6. **Create → GitHub Repo** → same repo again for the second service; set
+   its Root Directory to `frontend`. On its **Variables**, add
+   `INTERNAL_API_BASE_URL` = the backend URL from step 5. Generate a domain
+   for it too (target port 3000) — that URL is the app your team logs in to
+   (and what the Chrome extension's Settings should point at).
+
+**Render** (`render.yaml` in the repo root is a one-click Blueprint):
 
 1. Push this repo to GitHub.
 2. Render dashboard → **New > Blueprint** → point it at the repo. This
