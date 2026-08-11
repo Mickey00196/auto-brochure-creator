@@ -62,3 +62,24 @@ Locally that means `npm run dev` (frontend) and `uvicorn app.main:app`
 stores what it can confidently extract from the page and leaves the rest for
 you to fill in via the building's detail page (see "Same schema, two ways in"
 in the root README).
+
+**"The import timed out".** The popup's import request gives up after 60s
+(`popup.js`, `AbortSignal.timeout`) so it can never hang forever — this fires
+either because the backend's headless-browser render is taking too long, or
+because the target site is blocking/challenging automated access. Retry once;
+if it keeps happening for one site, that site likely needs a
+Playwright-side workaround (custom headers/stealth) rather than a longer
+timeout.
+
+## Maintainer note: the backend's headless browser
+
+`backend/app/services/scraping/generic_scraper.py::fetch_rendered_html`
+launches Chromium via Playwright's normal browser resolution (no hardcoded
+`executable_path`) — it relies on whatever `playwright install chromium` put
+in Playwright's default cache dir, or on `PLAYWRIGHT_BROWSERS_PATH` if that
+env var is set. **Do not hardcode an `executable_path`** — a fixed path only
+matches wherever the browser happened to be installed on one particular
+machine (e.g. a dev sandbox) and silently breaks every import, including
+funda.nl, on any other machine or deployment. `tests/test_scraping.py`
+(`test_fetch_rendered_html_does_not_hardcode_a_sandbox_browser_path`) guards
+against this regressing.
