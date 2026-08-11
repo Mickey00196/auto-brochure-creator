@@ -65,11 +65,17 @@ importBtn.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ urls: [activeTabUrl] }),
+      // The scrape can legitimately take up to ~15-30s (headless render +
+      // parse), but it must not hang the popup forever if the target site
+      // never responds — bound it so the UI always resolves to an error.
+      signal: AbortSignal.timeout(60_000),
     });
-  } catch {
-    setStatus("error", [
-      text(`Couldn't reach the app at ${appUrl}. Check that it's running, and that the URL under Settings is correct.`),
-    ]);
+  } catch (err) {
+    const reason =
+      err?.name === "TimeoutError" || err?.name === "AbortError"
+        ? "The import timed out — the target page may be blocking automated access."
+        : `Couldn't reach the app at ${appUrl}. Check that it's running, and that the URL under Settings is correct.`;
+    setStatus("error", [text(reason)]);
     importBtn.disabled = false;
     return;
   }
