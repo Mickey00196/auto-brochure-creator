@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Proposal Engine Importer",
+  "name": "Brochure Engine Importer",
   "version": "1.0.0",
-  "description": "Import the commercial listing you're viewing (funda in business, etc.) into the Real Estate Proposal Engine with one click.",
+  "description": "Import the commercial listing you're viewing (funda in business, etc.) into the Real Estate Brochure Engine with one click.",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Import this listing into the Proposal Engine"
+    "default_title": "Import this listing into the Brochure Engine"
   },
   "permissions": ["activeTab", "storage"],
   "host_permissions": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],

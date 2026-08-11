@@ -15,7 +15,7 @@ export function NavBar({ user }: { user?: { name: string; email: string } | null
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-baseline gap-2">
           <span className="text-sm font-bold tracking-wide text-accent">OFFICE SHORTLIST</span>
-          <span className="hidden text-sm text-muted sm:inline">Real Estate Proposal Engine</span>
+          <span className="hidden text-sm text-muted sm:inline">Real Estate Brochure Engine</span>
         </Link>
         <nav className="flex items-center gap-6 text-sm font-medium">
           {LINKS.map((link) => (

@@ -1,4 +1,4 @@
-/* Popup logic: send the active tab's URL to the Proposal Engine's existing
+/* Popup logic: send the active tab's URL to the Brochure Engine's existing
  * import endpoint (POST /imports/urls, Workflow 2) via the frontend's
  * authenticated /api/proxy route. The session lives in the app's httpOnly
  * cookie, so the extension never sees or stores the JWT — it just needs the
@@ -82,7 +82,7 @@ importBtn.addEventListener("click", async () => {
 
   if (res.status === 401) {
     setStatus("error", [
-      text("You're not logged in to the Proposal Engine. "),
+      text("You're not logged in to the Brochure Engine. "),
       link(`${appUrl}/login`, "Log in"),
       text(" in this browser, then try again."),
     ]);
@@ -100,7 +100,7 @@ importBtn.addEventListener("click", async () => {
   if (result?.status === "created") {
     const nodes = [
       text(`Imported "${result.title ?? activeTabUrl}". `),
-      link(`${appUrl}/buildings/${result.building_id}`, "Open it in the Proposal Engine"),
+      link(`${appUrl}/buildings/${result.building_id}`, "Open it in the Brochure Engine"),
       text(" to review and fill in anything the scraper couldn't determine."),
     ];
     if (result.message) nodes.push(document.createElement("br"), text(`Note: ${result.message}`));
