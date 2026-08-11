@@ -1,4 +1,4 @@
-# Real Estate Proposal Engine (v2)
+# Real Estate Brochure Engine (v2)
 
 A CRE brochure/PPTX/PDF generation engine, built from the ground up around
 gaps found in two real reference documents:
@@ -133,6 +133,10 @@ frontend/  Next.js (App Router) + TypeScript + Tailwind
   src/proxy.ts            the one auth gate: no valid session cookie, no page render
   Dockerfile             multi-stage build using `output: "standalone"`
 
+extension/ Chrome extension (Manifest V3) — one-click "import this listing" from
+           the page you're viewing, via the same /imports/urls endpoint as /import.
+           Install/troubleshooting: extension/README.md
+
 docker-compose.yml    local parity with production: Postgres + both Docker images
 render.yaml            one-click Render Blueprint (Postgres + both services)
 ```
@@ -238,8 +242,34 @@ redirect to `/login`, checked before anything else runs.
 
 ## Deploying it
 
-**Render** (recommended — `render.yaml` in the repo root is a one-click
-Blueprint):
+**Railway** (`backend/railway.json` / `frontend/railway.json` carry the
+build + healthcheck config; you create the services and point each at its
+folder):
+
+1. Push this repo to GitHub.
+2. [railway.app](https://railway.app) → **New Project** → **Deploy from
+   GitHub repo** → pick this repo. In the service that gets created, open
+   **Settings → Source** and set **Root Directory** to `backend`.
+3. In the same project: **Create → Database → PostgreSQL**.
+4. On the backend service → **Variables**, add:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (a reference to the
+     database service — type it exactly like that)
+   - `JWT_SECRET_KEY` = a long random string
+   - `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_NAME` /
+     `BOOTSTRAP_ADMIN_PASSWORD` = your own first login account — created
+     automatically on first boot since Railway offers no shell to run
+     `app.cli create-user`. Remove these variables once you've logged in
+     (the account persists; existing accounts are never modified by them).
+   - optionally `GOOGLE_MAPS_API_KEY`
+5. Backend service → **Settings → Networking → Generate Domain** (target
+   port 8000). Note the URL.
+6. **Create → GitHub Repo** → same repo again for the second service; set
+   its Root Directory to `frontend`. On its **Variables**, add
+   `INTERNAL_API_BASE_URL` = the backend URL from step 5. Generate a domain
+   for it too (target port 3000) — that URL is the app your team logs in to
+   (and what the Chrome extension's Settings should point at).
+
+**Render** (`render.yaml` in the repo root is a one-click Blueprint):
 
 1. Push this repo to GitHub.
 2. Render dashboard → **New > Blueprint** → point it at the repo. This
@@ -282,7 +312,9 @@ reverse proxy — the standard most PaaS load balancers already set), and a
    cover the same paths via the API directly. Every export reads from that
    one Proposal record.
 2. **From external URLs** — paste one or more listing URLs at `/import` in the
-   frontend, or `POST /imports/urls` directly. Each URL is rendered with the
+   frontend, `POST /imports/urls` directly, or click the Chrome extension
+   (`extension/` — see its README for install steps) while viewing a listing
+   to import the current page without copy-pasting anything. Each URL is rendered with the
    pre-installed Playwright Chromium (`fetch_rendered_html`) and parsed with
    BeautifulSoup (`parse_html`): title, address/city (best-effort, from the
    page title), meta description, photos (logo/icon images filtered out),

@@ -57,3 +57,37 @@ def test_me_returns_current_user(client):
     res = client.get("/auth/me")
     assert res.status_code == 200
     assert res.json()["email"] == "test@example.test"
+
+
+def test_bootstrap_admin_from_env_creates_admin_once(monkeypatch):
+    """Platforms without shell access (Railway et al.) provision the first
+    account via BOOTSTRAP_ADMIN_* env vars at startup — must be idempotent
+    across restarts, and a no-op when the vars aren't set."""
+    from app.cli import bootstrap_admin_from_env
+    from app.database import SessionLocal, init_db
+    from app.models.enums import UserRole
+
+    init_db()
+    email = "boot-admin@example.test"
+
+    # No vars set → no-op
+    bootstrap_admin_from_env()
+    db = SessionLocal()
+    try:
+        assert db.query(User).filter(User.email == email).first() is None
+
+        monkeypatch.setenv("BOOTSTRAP_ADMIN_EMAIL", "Boot-Admin@Example.Test")
+        monkeypatch.setenv("BOOTSTRAP_ADMIN_PASSWORD", "bootpass123")
+        monkeypatch.setenv("BOOTSTRAP_ADMIN_NAME", "Boot Admin")
+        bootstrap_admin_from_env()
+        bootstrap_admin_from_env()  # second startup: must not duplicate or error
+
+        users = db.query(User).filter(User.email == email).all()
+        assert len(users) == 1
+        assert users[0].role == UserRole.ADMIN
+
+        from app.auth import verify_password
+
+        assert verify_password("bootpass123", users[0].hashed_password)
+    finally:
+        db.close()

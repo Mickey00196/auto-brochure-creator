@@ -1,6 +1,8 @@
 """§7 Scraping Engine — pure-function tests (no network dependency)."""
 from __future__ import annotations
 
+import inspect
+
 from app.services.scraping.generic_scraper import (
     extract_amenities,
     extract_contract_term,
@@ -8,6 +10,7 @@ from app.services.scraping.generic_scraper import (
     extract_price_raw,
     extract_units_from_text,
     extract_year_built,
+    fetch_rendered_html,
     guess_address_from_title,
     parse_area_subdivision,
     parse_html,
@@ -159,3 +162,17 @@ def test_extract_amenities_uses_word_boundaries_not_substring_match():
     "per spa[c]e per year" as a spa amenity."""
     amenities = extract_amenities("Parking is available: €2,200 per space per year.")
     assert "Spa" not in amenities
+
+
+def test_fetch_rendered_html_does_not_hardcode_a_sandbox_browser_path():
+    """Regression test: this once launched Chromium with
+    executable_path="/opt/pw-browsers/chromium" — a path that only exists in
+    the dev sandbox it was written in. The production image installs
+    Chromium via `playwright install --with-deps chromium` into Playwright's
+    own default location, so the hardcoded path made every single import
+    (funda.nl included) fail immediately in production. Guard against that
+    coming back by asserting the launch call carries no fixed browser path,
+    so Playwright always resolves whatever is actually installed."""
+    source = inspect.getsource(fetch_rendered_html)
+    assert "executable_path" not in source
+    assert "/opt/pw-browsers" not in source

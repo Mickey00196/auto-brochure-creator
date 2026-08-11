@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Brochure Engine Importer</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" width="24" height="24" />
+    <h1>Brochure Engine Importer</h1>
+  </header>
+
+  <main>
+    <p id="tab-url" class="tab-url" title=""></p>
+
+    <button id="import-btn" disabled>Import this listing</button>
+
+    <div id="status" class="status" hidden></div>
+
+    <details id="settings">
+      <summary>Settings</summary>
+      <label for="app-url">Brochure Engine app URL</label>
+      <input id="app-url" type="url" placeholder="http://localhost:3000" spellcheck="false" />
+      <button id="save-btn" class="secondary">Save</button>
+      <p class="hint">
+        The address where the app's frontend runs — <code>http://localhost:3000</code>
+        during local development, or your deployed URL (e.g.
+        <code>https://proposal-engine-frontend.onrender.com</code>). You must be
+        logged in to the app in this browser for imports to work.
+      </p>
+    </details>
+  </main>
+</body>
+<script src="popup.js"></script>
+</html>

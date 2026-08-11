@@ -17,6 +17,41 @@ from app.models.enums import UserRole
 from app.models.user import User
 
 
+def bootstrap_admin_from_env() -> None:
+    """Provision a first admin account from env vars, for platforms with no
+    shell access to run create-user (Railway, most PaaS free tiers). Called
+    on every startup (app/main.py lifespan); a no-op unless
+    BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD are both set, and
+    idempotent once the account exists — so the vars can (and should) be
+    removed from the deployment after the first successful login. Existing
+    accounts are never modified: this can only create, not reset a password.
+    """
+    import os
+
+    email = os.environ.get("BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
+    password = os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "")
+    if not email or not password:
+        return
+    name = os.environ.get("BOOTSTRAP_ADMIN_NAME", "").strip() or email.split("@")[0]
+
+    db = SessionLocal()
+    try:
+        if db.query(User).filter(User.email == email).first():
+            return
+        db.add(
+            User(
+                email=email,
+                name=name,
+                hashed_password=hash_password(password),
+                role=UserRole.ADMIN,
+            )
+        )
+        db.commit()
+        print(f"Bootstrapped admin account {email} from BOOTSTRAP_ADMIN_* env vars.")
+    finally:
+        db.close()
+
+
 def create_user(email: str, name: str, password: str, role: str) -> None:
     init_db()
     db = SessionLocal()
