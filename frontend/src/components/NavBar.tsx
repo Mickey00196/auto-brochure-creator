@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
 
 const LINKS = [
-  { href: "/", label: "Dashboard" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/buildings", label: "Buildings & Units" },
   { href: "/import", label: "Import from URLs" },
   { href: "/clients", label: "Clients" },

@@ -22,7 +22,7 @@ export default async function BuildingsPage() {
       {buildings.length === 0 && (
         <Card>
           No buildings yet. Load the reference brochure demo data from the{" "}
-          <Link href="/" className="text-accent hover:underline">
+          <Link href="/dashboard" className="text-accent hover:underline">
             dashboard
           </Link>
           , or create one via the API.

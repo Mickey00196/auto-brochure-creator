@@ -16,7 +16,7 @@ export default async function ClientsPage() {
       {clients.length === 0 && (
         <Card>
           No clients yet. Load the reference brochure demo data from the{" "}
-          <Link href="/" className="text-accent hover:underline">
+          <Link href="/dashboard" className="text-accent hover:underline">
             dashboard
           </Link>
           .
