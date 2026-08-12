@@ -130,6 +130,29 @@ _ENERGY_LABEL_RE = re.compile(r"energy label\s*[:\-]?\s*([A-G]\+*)", re.IGNORECA
 _YEAR_BUILT_RE = re.compile(r"(?:built in|year of construction|constructed in)\D{0,10}(\d{4})", re.IGNORECASE)
 _CONTRACT_TERM_RE = re.compile(r"contract term\s*[:\-]?\s*([^.\n]{3,60})", re.IGNORECASE)
 _SKIP_IMAGE_KEYWORDS = ("logo", "icon", "sprite", "avatar", "pixel")
+# Matches size/format variant suffixes brokerage CDNs append to an otherwise
+# identical filename, e.g. "house-1600x900.jpg", "house-thumb.jpg",
+# "house@2x.jpg" — stripped so those variants collapse to the same photo
+# instead of being counted as separate images.
+_PHOTO_SIZE_SUFFIX_RE = re.compile(
+    r"([-_]?(\d{2,4}x\d{2,4}|thumb\w*|small|medium|large|xl|xs|preview)|@\d+x)+$",
+    re.IGNORECASE,
+)
+
+
+def _photo_dedup_key(photo_url: str) -> str:
+    """Normalize a photo URL to a dedup key so the same picture re-served at
+    a different size/CDN variant (query string, filename suffix) collapses
+    to one entry instead of appearing as a duplicate in the gallery."""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(photo_url)
+    path = parts.path
+    stem, _, ext = path.rpartition(".")
+    if stem:
+        stem = _PHOTO_SIZE_SUFFIX_RE.sub("", stem)
+        path = f"{stem}.{ext}" if ext else stem
+    return f"{parts.netloc}{path}".lower()
 
 # Fixed vocabulary matched against page text — a real per-source implementation
 # would read a structured amenities list from the DOM; this is the same kind
@@ -218,14 +241,19 @@ def parse_html(html: str, url: str) -> ScrapedListing:
         if not src or any(k in src.lower() for k in _SKIP_IMAGE_KEYWORDS):
             continue
         photo_url = urljoin(url, src)
-        if photo_url in seen_photos:
-            # Rendered pages (fetch_rendered_html) commonly duplicate <img>
-            # nodes for the same photo — e.g. carousels that clone the first/
-            # last slide for infinite-loop scrolling, or a lazy-load
-            # placeholder whose src gets overwritten to match another slide
-            # once JS runs. Skip repeats instead of re-adding the same photo.
+        dedup_key = _photo_dedup_key(photo_url)
+        if dedup_key in seen_photos:
+            # Rendered pages (fetch_rendered_html) commonly repeat the same
+            # photo across multiple <img> nodes — carousels that clone the
+            # first/last slide for infinite-loop scrolling, a thumbnail strip
+            # next to the main viewer, or a lazy-load placeholder that gets
+            # overwritten once JS runs. These aren't always byte-identical
+            # URLs: the same photo is often re-served at another size/CDN
+            # variant via query string (?w=200 vs ?w=1600) or a filename
+            # suffix (-thumb, @2x), so dedup on a normalized key rather than
+            # the raw URL. Skip repeats instead of re-adding the same photo.
             continue
-        seen_photos.add(photo_url)
+        seen_photos.add(dedup_key)
         photos.append(photo_url)
         if len(photos) >= 8:
             break

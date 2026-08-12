@@ -92,6 +92,28 @@ def test_parse_html_extracts_title_description_photos():
     assert listing.energy_label == "A"
 
 
+def test_parse_html_dedupes_same_photo_served_at_different_sizes():
+    """Rendered brokerage pages commonly re-serve the same photo multiple
+    times as size/CDN variants — a resized query string, a filename suffix
+    like "-1600x900" or "_thumb", or an "@2x" retina variant — rather than
+    repeating the exact same URL. These must collapse to one photo each."""
+    html = """
+    <html><body>
+      <img src="/photos/exterior.jpg">
+      <img src="/photos/exterior.jpg?w=200">
+      <img src="/photos/exterior-1600x900.jpg">
+      <img src="/photos/exterior_thumb.jpg">
+      <img src="/photos/interior.jpg">
+      <img src="/photos/interior@2x.jpg">
+    </body></html>
+    """
+    listing = parse_html(html, "https://example-brokerage.test/listings/100")
+    assert listing.photos == [
+        "https://example-brokerage.test/photos/exterior.jpg",
+        "https://example-brokerage.test/photos/interior.jpg",
+    ]
+
+
 def test_parse_html_preserves_subdivision_and_rent():
     """Same fix as §7's core requirement, now exercised end-to-end from raw
     HTML rather than a pre-split floor block."""
