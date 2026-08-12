@@ -212,11 +212,21 @@ def parse_html(html: str, url: str) -> ScrapedListing:
     description = desc_tag.get("content", "").strip() if desc_tag else ""
 
     photos: list[str] = []
+    seen_photos: set[str] = set()
     for img in soup.find_all("img"):
         src = img.get("src") or img.get("data-src")
         if not src or any(k in src.lower() for k in _SKIP_IMAGE_KEYWORDS):
             continue
-        photos.append(urljoin(url, src))
+        photo_url = urljoin(url, src)
+        if photo_url in seen_photos:
+            # Rendered pages (fetch_rendered_html) commonly duplicate <img>
+            # nodes for the same photo — e.g. carousels that clone the first/
+            # last slide for infinite-loop scrolling, or a lazy-load
+            # placeholder whose src gets overwritten to match another slide
+            # once JS runs. Skip repeats instead of re-adding the same photo.
+            continue
+        seen_photos.add(photo_url)
+        photos.append(photo_url)
         if len(photos) >= 8:
             break
 

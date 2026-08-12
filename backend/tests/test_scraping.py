@@ -73,6 +73,7 @@ _SAMPLE_HTML = """
 </head>
 <body>
   <img src="/photos/exterior.jpg">
+  <img src="/photos/exterior.jpg">
   <img src="/icons/logo.png">
   <p>Total area 320 m², units from 120 m². Rent from €260 per m² per year.
   Service charge €55 per m² per year. Contract term: 5 years, negotiable.
